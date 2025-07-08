@@ -5,7 +5,7 @@ import os
 import json
 from dotenv import load_dotenv
 
-# ========== 环境变量与全局配置 ==========
+'''# ========== 环境变量与全局配置 ==========
 load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY")
 base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
@@ -38,9 +38,40 @@ if os.path.exists(search_results_path):
         all_search_results = json.load(f)
 else:
     industry_info_path = agent_d.search_industry_info([agent_d.target_company] + [c['name'] for c in competitors])
+'''
 
+from agents.agent_data.agent_data import DataAgent
+from config.llm_config import LLMConfig
+import os
+from dotenv import load_dotenv
 
-'''# ========== 分析代理实例化 ==========
-agent_a = AgentA(
+# 1. 载入环境变量
+load_dotenv()
+api_key = os.getenv("OPENAI_API_KEY")
+base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+model = os.getenv("OPENAI_MODEL", "gpt-4")
+
+# 2. 初始化 LLM 配置
+llm_config = LLMConfig(
+    api_key=api_key,
+    base_url=base_url,
+    model=model,
+    temperature=0.7,
+    max_tokens=4096
+)
+
+# 3. 初始化 DataAgent
+agent_d = DataAgent(
+    target_company="商汤科技",
+    target_code="00020",
+    target_market="HK",
     llm_config=llm_config
-)'''
+)
+
+# 4. 执行代理流程
+result_context = agent_d.run()
+
+# 5. 可选：打印输出或保存中间结果
+print("✅ 执行完成，结果内容：")
+for key, value in result_context.items():
+    print(f"\n[{key.upper()}]\n{value if isinstance(value, str) else '[结构化数据]'}")
