@@ -57,7 +57,7 @@ llm_config = LLMConfig(
     base_url=base_url,
     model=model,
     temperature=0.7,
-    max_tokens=4096
+    max_tokens=8192,
 )
 
 # 3. 初始化 DataAgent
