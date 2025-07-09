@@ -1,77 +1,34 @@
-from agents.agent_data.data_scratch_agent import DataAgent
-# from agents.agent_analysis.data_analysis_agent import AgentA
+from BaseAgent.base_agent import BaseAgent
+from BaseAgent.profile import AgentProfile
+from BaseAgent.memory import AgentMemory
+from BaseAgent.planner import AgentPlanner
+from toolset.action_financial import FinancialActionToolset
 from config.llm_config import LLMConfig
-import os
-import json
-from dotenv import load_dotenv
-
-'''# ========== 环境变量与全局配置 ==========
-load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
-base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-model = os.getenv("OPENAI_MODEL", "gpt-4")
-
-llm_config = LLMConfig(
-    api_key=api_key,
-    base_url=base_url,
-    model=model,
-    temperature=0.7,
-    max_tokens=8192,
-)
-
-# ========== 数据代理实例化 ==========
-agent_d = DataAgent("商汤科技", "00020", "HK", llm_config=llm_config)
-
-competitors = agent_d.get_competitor_listed_companies()
-agent_d.get_all_financial_data(competitors)
-
-companies_info = [(agent_d.target_company, agent_d.target_code, agent_d.target_market)]
-companies_info += [(c['name'], c['code'], c['market']) for c in competitors]
-company_infos = agent_d.get_all_company_info(companies_info)
-
-shareholder_analysis = agent_d.get_shareholder_analysis()
-
-# 如果all_search_results.json文件存在，则读取
-search_results_path = os.path.join(agent_d.industry_dir, "all_search_results.json")
-if os.path.exists(search_results_path):
-    with open(search_results_path, 'r', encoding='utf-8') as f:
-        all_search_results = json.load(f)
-else:
-    industry_info_path = agent_d.search_industry_info([agent_d.target_company] + [c['name'] for c in competitors])
-'''
-
-from agents.agent_data.agent_data import DataAgent
-from config.llm_config import LLMConfig
+from utils.llm_helper import LLMHelper
 import os
 from dotenv import load_dotenv
 
-# 1. 载入环境变量
 load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
-base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-model = os.getenv("OPENAI_MODEL", "gpt-4")
 
-# 2. 初始化 LLM 配置
+# 初始化组件
 llm_config = LLMConfig(
-    api_key=api_key,
-    base_url=base_url,
-    model=model,
-    temperature=0.7,
-    max_tokens=8192,
+    api_key=os.getenv("OPENAI_API_KEY"),
+    base_url=os.getenv("OPENAI_BASE_URL"),
+    model=os.getenv("OPENAI_MODEL")
 )
 
-# 3. 初始化 DataAgent
-agent_d = DataAgent(
-    target_company="商汤科技",
-    target_code="00020",
-    target_market="HK",
-    llm_config=llm_config
-)
+##### 数据提取Agent #####
+profile = AgentProfile("商汤科技", "00020", "HK")
+memory = AgentMemory("./data/financials", "./data/info", "./data/industry")
+llm = LLMHelper(llm_config)
+planner = AgentPlanner(profile, llm)
+action = FinancialActionToolset(profile, memory, llm, llm_config)
 
-# 4. 执行代理流程
-result_context = agent_d.run()
+toolset = [fn for fn in dir(action) if not fn.startswith("__") and callable(getattr(action, fn))]
 
-# 5. 可选：打印输出或保存中间结果
-print("✅ 执行完成，结果内容：")
-for key, value in result_context.items():
-    print(f"\n[{key.upper()}]\n{value if isinstance(value, str) else '[结构化数据]'}")
+agent = BaseAgent(profile, memory, planner, action, toolset)
+
+result = agent.run()
+
+for k, v in result.items():
+    print(f"[{k}]\n{v if isinstance(v, str) else '[结构化数据]'}")
