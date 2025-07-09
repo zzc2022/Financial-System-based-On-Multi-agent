@@ -30,15 +30,5 @@ class AgentPlanner:
             }
         )
 
-        # prompt = (
-        #     f"你是一个金融分析流程规划Agent。\n"
-        #     f"目标公司为：{self.profile.get_identity()}。\n"
-        #     f"当前已完成步骤：{', '.join(completed) or '无'}。\n"
-        #     f"失败步骤：{', '.join(failed) or '无'}。\n"
-        #     f"可调用工具函数有：{', '.join(toolset)}。\n\n"
-        #     f"以下是当前上下文：\n{context_summary}\n"
-        #     f"请决定下一步要调用哪个函数（只返回函数名），若任务已完成请返回 'done'。\n"
-        #     f"注意：必须先执行 get_competitor_listed_companies()，且执行一遍就行了。"
-        # )
         reply = self.llm.call(user_prompt, system_prompt=system_prompt + "你是一个规划器，只返回函数名")
         return reply.strip() if reply.strip() in toolset else "done"
