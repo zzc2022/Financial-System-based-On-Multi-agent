@@ -1,5 +1,3 @@
-# agent_d.py
-
 import os
 import json
 import time
@@ -52,19 +50,54 @@ class AgentMemory:
         return company_files
 
 class AgentPlanner:
-    def __init__(self, profile, memory):
+    def __init__(self, profile, memory, llm):
         self.profile = profile
         self.memory = memory
-
-    def plan_workflow(self) -> List[str]:
-        # 可以是动态规划，这里写死一条默认执行链
-        return [
+        self.llm = llm
+        self.valid_steps = [
             "get_competitor_listed_companies",
             "get_all_financial_data",
             "get_all_company_info",
             "get_shareholder_analysis",
             "search_industry_info"
         ]
+
+class AgentPlanner:
+    def __init__(self, profile, memory, llm):
+        self.profile = profile
+        self.memory = memory
+        self.llm = llm
+        self.valid_steps = [
+            "get_competitor_listed_companies",
+            "get_all_financial_data",
+            "get_all_company_info",
+            "get_shareholder_analysis",
+            "search_industry_info"
+        ]
+
+    def decide_next_step(self, context: Dict[str, any], completed: List[str], failed: List[str]) -> str:
+        context_summary = ""
+        for key, value in context.items():
+            if isinstance(value, str):
+                content = value[:1000].replace('\n', ' ')  # 截断、清理过长文本
+            else:
+                content = "[结构化数据]"
+            context_summary += f"【{key.upper()}】{content}\n\n"
+
+        prompt = (
+            f"你是一个金融分析数据规划Agent。\n"
+            f"当前目标公司为 {self.profile.get_identity()}。\n\n"
+            f"以下是当前已完成的步骤与输出内容摘要：\n"
+            f"{context_summary or '无'}\n"
+            f"当前执行失败的步骤：{', '.join(failed) or '无'}。\n\n"
+            f"可调用函数有：{', '.join(self.valid_steps)}。\n"
+            f"请判断下一步应该调用哪个函数（直接返回函数名即可），"
+            f"如认为需要重新执行某个步骤，也请返回该函数名。若任务已完成，请返回 done。"
+        )
+        reply = self.llm.call(prompt, system_prompt="你是一个金融任务规划Agent，只返回一个函数名")
+        step = reply.strip()
+        return step if step in self.valid_steps else "done"
+
 
 class AgentAction:
     def __init__(self, profile, memory, llm, llm_config=None):
@@ -153,27 +186,40 @@ class DataAgent:
         self.memory = AgentMemory("./data/financials", "./data/info", "./data/industry")
         self.llm = LLMHelper(llm_config)
         self.actions = AgentAction(self.profile, self.memory, self.llm, llm_config)
-        self.planner = AgentPlanner(self.profile, self.memory)
+        self.planner = AgentPlanner(self.profile, self.memory, self.llm )
 
     def run(self):
-        plan = self.planner.plan_workflow()
+        completed, failed = [], []
         context = {}
-        for step in plan:
-            print(f"🧠 执行: {step}")
-            func = getattr(self.actions, step, None)
-            if func:
-                if step == "get_all_financial_data":
+
+        while True:
+            next_step = self.planner.decide_next_step(context, completed, failed)
+            if next_step == "done":
+                break
+
+            print(f"🧠 LLM决定执行：{next_step}")
+            func = getattr(self.actions, next_step, None)
+            try:
+                if next_step == "get_all_financial_data":
                     context['financial'] = func(context.get("competitors", []))
-                elif step == "get_all_company_info":
+                elif next_step == "get_all_company_info":
                     companies = [(self.profile.company, self.profile.code, self.profile.market)]
                     competitors = context.get("competitors", [])
                     companies += [(c['name'], c['code'], c['market']) for c in competitors]
                     context['company_info'] = func(companies)
-                elif step == "search_industry_info":
+                elif next_step == "search_industry_info":
                     names = [self.profile.company] + [c['name'] for c in context.get("competitors", [])]
                     context['industry_info'] = func(names)
-                elif step == "get_shareholder_analysis":
+                elif next_step == "get_shareholder_analysis":
                     context['shareholder_analysis'] = func()
-                else:
+                elif next_step == "get_competitor_listed_companies":
                     context['competitors'] = func()
+                else:
+                    print(f"⚠️ 无法识别的步骤: {next_step}")
+                    failed.append(next_step)
+                    continue
+                completed.append(next_step)
+            except Exception as e:
+                print(f"❌ {next_step} 执行失败: {e}")
+                failed.append(next_step)
         return context
