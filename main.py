@@ -18,8 +18,8 @@ llm_config = LLMConfig(
     model=os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview")
 )
 
-# 初始化嵌入模型（可选）
-embedding_config = create_embedding_config("qwen")  # 使用Qwen API
+# 初始化嵌入模型
+embedding_config = create_embedding_config("qwen")
 embedding_model = embedding_config.get_model()
 
 ##### 数据提取Agent #####
@@ -31,9 +31,9 @@ action = FinancialActionToolset(profile, memory, llm, llm_config)
 
 toolset = [fn for fn in dir(action) if not fn.startswith("__") and callable(getattr(action, fn))]
 
-agent = BaseAgent(profile, memory, planner, action, toolset)
+agent_d = BaseAgent(profile, memory, planner, action, toolset)
 
-result = agent.run()
+result = agent_d.run()
 
 for k, v in result.items():
     print(f"[{k}]\n{v if isinstance(v, str) else '[结构化数据]'}")

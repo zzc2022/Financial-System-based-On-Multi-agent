@@ -274,6 +274,48 @@ class AgentMemory:
             else:
                 self.save_persistent(key, {"value": value, "type": type(value).__name__})
 
+    def smart_store(self, key: str, value: Any, meta: Optional[dict] = None):
+        """
+        智能分流存储：
+        - 结构化且大（如财报/报告）→ 长期记忆
+        - 结论/摘要/洞察（字符串且含关键词）→ 向量记忆
+        - 其他 → 上下文记忆
+        """
+        if isinstance(value, dict) and len(str(value)) > 1000:
+            self.save_persistent(key, value)
+        elif isinstance(value, str) and any(word in value for word in ["结论", "摘要", "洞察", "insight", "summary"]):
+            self.save_embedding(key, value, meta if meta is not None else {})
+        else:
+            self.context_set(key, value)
+
+    # ======== 对话记忆 ========
+    # TODO：只是把接口留好了，具体实现需要根据实际需求调整
+    def store_dialogue_summary(self, user_prompt: str, llm_output: str, meta: Optional[dict] = None):
+        """
+        存储一轮对话的摘要（用户prompt+LLM输出），作为长期记忆（embedding），用于经验/反例学习。
+        """
+        summary_text = f"用户提问: {user_prompt}\nLLM回复: {llm_output}"
+        # 可以在这里加摘要算法/LLM摘要，当前直接拼接
+        self.save_embedding(f"dialogue_{int(time.time())}", summary_text, meta if meta else {})
+
+    def store_dialogue_summary_with_llm(self, user_prompt: str, llm_output: str, llm_helper, meta: Optional[dict] = None):
+        """
+        用LLM自动摘要一轮对话（用户prompt+LLM输出），并存为长期记忆（embedding）。
+        llm_helper: 需有call/summary等方法
+        """
+        # 拼接原始对话
+        raw_text = f"用户提问: {user_prompt}\nLLM回复: {llm_output}"
+        # 调用LLM生成摘要
+        try:
+            summary = llm_helper.call(
+                f"请对以下问答进行简明摘要，突出核心要点：\n{raw_text}",
+                system_prompt="你是一个善于总结的金融分析助理"
+            )
+        except Exception as e:
+            print(f"❌ LLM摘要失败，使用原文: {e}")
+            summary = raw_text
+        self.save_embedding(f"dialogue_{int(time.time())}", summary, meta if meta else {})
+
     # ======== 记忆统计 ========
     def get_memory_stats(self) -> Dict[str, Any]:
         """获取记忆系统统计信息"""
