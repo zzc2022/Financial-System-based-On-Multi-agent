@@ -39,12 +39,10 @@ class FinancialActionToolset:
                 time.sleep(2)
             except Exception as e:
                 print(f"⚠️ 获取失败: {e}")
-        # data = get_all_financial_statements(self.p.code, self.p.market, "年度")
-        # save_financial_statements_to_csv(data, self.p.code, self.p.market, self.p.company, "年度", self.m.data_dir)
         return data_lst
 
     def get_all_company_info(self, context):
-        def _parse_market( market_str: str, code: str) -> str:
+        def _parse_market( market_str: str, code: str) -> tuple[str, str]:
             """
             解析市场信息并格式化股票代码
             
@@ -78,7 +76,8 @@ class FinancialActionToolset:
         result = ""
         for item in companies:
             info = get_stock_intro(item['code'], item['market'])
-            result += info
+            if info:
+                result += info
         return result
 
     def get_shareholder_analysis(self, context):
