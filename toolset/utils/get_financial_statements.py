@@ -167,7 +167,7 @@ def save_financial_statements_to_csv(financial_statements: Dict[str, Optional[pd
                                    stock_code: str = "00020", 
                                    market: str = "HK",
                                    period: str = "年度",
-                                   company_name: str = None,
+                                   company_name: Optional[str] = None,
                                    save_dir: str = ".") -> None:
     """
     将财务报表保存为CSV文件

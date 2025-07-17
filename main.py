@@ -23,15 +23,36 @@ embedding_config = create_embedding_config("qwen")
 embedding_model = embedding_config.get_model()
 
 ##### 数据提取Agent #####
-profile = AgentProfile("商汤科技", "00020", "HK")
+data_agent_profile = AgentProfile(
+    name="DataAgent",
+    role="负责数据采集与清洗，涵盖财务报表、公司信息、行业情报等",
+    objectives=[
+        "采集目标公司财务三大表数据",
+        "收集主要竞争对手名单及其财务数据",
+        "获取公司基本介绍和行业信息"
+    ],
+    tools=["get_financials", "get_stock_info", "web_search"],
+    knowledge="具备港股和A股市场结构与财报格式知识，理解基本财务术语",
+    interaction={
+        "input": "公司名称与代码",
+        "output": "结构化的数据表（CSV）、文本信息（TXT/JSON）"
+    },
+    memory_type="short-term",
+    config={
+        "company": "商汤科技",
+        "code": "00020",
+        "market": "HK"
+    }
+)
+
 memory = AgentMemory("./data/financials", "./data/info", "./data/industry", embedding_model)
 llm = LLMHelper(llm_config)
-planner = AgentPlanner(profile, llm)
-action = FinancialActionToolset(profile, memory, llm, llm_config)
+planner = AgentPlanner(data_agent_profile, llm)
+action = FinancialActionToolset(data_agent_profile, memory, llm, llm_config)
 
 toolset = [fn for fn in dir(action) if not fn.startswith("__") and callable(getattr(action, fn))]
 
-agent_d = BaseAgent(profile, memory, planner, action, toolset)
+agent_d = BaseAgent(data_agent_profile, memory, planner, action, toolset)
 
 result = agent_d.run()
 

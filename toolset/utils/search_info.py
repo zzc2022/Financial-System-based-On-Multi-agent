@@ -1,47 +1,42 @@
 
+"""
+搜索信息模块
+支持 DuckDuckGo 和搜狗搜索
+"""
 
-# # 示例：搜索中文文本
-# from duckduckgo_search import DDGS
+from .search_engine import create_search_engine
 
-
-# results2 = DDGS().text(
-#     keywords="百度的行业地位",  # 输入中文查询词
-#     region="cn-zh",           # 指定中国-中文区域
-#     max_results=10
-# )
-# print("搜索结果：")
-# print(results2)
-
-from duckduckgo_search import DDGS
-import json
-import os
-import time
-from typing import List
-
-def search_industry_info(companies: List[str], max_results) -> str:
-        """
-        搜索行业相关信息
+def search_company_industry_info(company_name: str, engine: str = "sogou", max_results: int = 10):
+    """
+    搜索公司行业信息
+    
+    Args:
+        company_name: 公司名称
+        engine: 搜索引擎 ('ddg' 或 'sogou')
+        max_results: 最大结果数
         
-        Args:
-            companies (List[str]): 需要搜索的公司名称列表
-            
-        Returns:
-            str: 搜索结果保存的JSON文件路径
-                搜索内容包括行业地位、市场份额、竞争分析、业务模式等
-        """
-        all_results = {}
-        for name in companies:
-            keywords = f"{name} 行业地位 市场份额 竞争分析 业务模式"
-            try:
-                print(f"🔍 搜索: {keywords}")
-                results = DDGS().text(keywords=keywords, region="cn-zh", max_results=max_results)
-                all_results[name] = results
-                import random
-                time.sleep(random.randint(20, 35))  # 随机延时，避免请求过快
-            except Exception as e:
-                print(f"搜索失败: {e}")
-        # result_path = os.path.join(self.industry_dir, "all_search_results.json")
-        # with open(result_path, 'w', encoding='utf-8') as f:
-        #     json.dump(all_results, f, ensure_ascii=False, indent=2)
-        # return result_path
-        return results
+    Returns:
+        搜索结果列表
+    """
+    search_engine = create_search_engine(engine)
+    keywords = f"{company_name}的行业地位"
+    return search_engine.search(keywords, max_results)
+
+# 示例用法
+if __name__ == "__main__":
+    # 使用 DuckDuckGo 搜索
+    print("=== DuckDuckGo 搜索结果 ===")
+    ddg_results = search_company_industry_info("百度", engine="ddg", max_results=5)
+    for i, result in enumerate(ddg_results, 1):
+        print(f"{i}. {result['title']}")
+        print(f"   {result['description'][:100]}...")
+    
+    # 尝试使用搜狗搜索
+    print("\n=== 搜狗搜索结果 ===")
+    try:
+        sogou_results = search_company_industry_info("百度", engine="sogou", max_results=5)
+        for i, result in enumerate(sogou_results, 1):
+            print(f"{i}. {result['title']}")
+            print(f"   {result['description'][:100]}...")
+    except Exception as e:
+        print(f"搜狗搜索不可用: {e}")

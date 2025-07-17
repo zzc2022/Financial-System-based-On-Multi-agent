@@ -2,7 +2,7 @@
 from toolset.utils.get_financial_statements import get_all_financial_statements, save_financial_statements_to_csv
 from toolset.utils.get_stock_intro import get_stock_intro, save_stock_intro_to_txt
 from toolset.utils.get_shareholder_info import get_shareholder_info, get_table_content
-from toolset.utils.search_info import search_industry_info
+from toolset.utils.search_engine import SearchEngine
 from toolset.utils.identify_competitors import identify_competitors_with_ai
 from duckduckgo_search import DDGS
 import time, random, os
@@ -21,7 +21,7 @@ class FinancialActionToolset:
             api_key=self.cfg.api_key,
             base_url=self.cfg.base_url,
             model_name=self.cfg.model,
-            company_name=self.p.company
+            company_name=self.p.get_config()['company']
         )
         result = [c for c in result if c.get('market') != "未上市"]
         return result
@@ -31,11 +31,11 @@ class FinancialActionToolset:
         data_lst = []
         for p in companies:
             try:
-                name, code, market = p['name'], p['code'], p['market']
-                print(f"获取：{name}({market}:{code})")
+                company, code, market = p['company'], p['code'], p['market']
+                print(f"获取：{company}({market}:{code})")
                 data = get_all_financial_statements(code, market, "年度")
                 data_lst.append(data)
-                save_financial_statements_to_csv(data, code, market, name, "年度", self.m.data_dir)
+                save_financial_statements_to_csv(data, code, market, company, "年度", self.m.data_dir)
                 time.sleep(2)
             except Exception as e:
                 print(f"⚠️ 获取失败: {e}")
@@ -78,6 +78,11 @@ class FinancialActionToolset:
             info = get_stock_intro(item['code'], item['market'])
             if info:
                 result += info
+                # 保存简介到txt文件
+                company = item.get('company', item['code'])
+                filecompany = f"{company}_{item['market']}_{item['code']}.txt"
+                save_path = os.path.join(self.m.info_dir, filecompany)
+                save_stock_intro_to_txt(item['code'], item['market'], save_path)
         return result
 
     def get_shareholder_analysis(self, context):
@@ -87,7 +92,7 @@ class FinancialActionToolset:
             return self.llm.call("分析以下股东信息：\n" + content, system_prompt="你是股东分析专家")
         return "股东信息获取失败"
 
-    def search_industry_info(self, context):
+    def search_industry_info(self, context, engine: str = "sogou"):
         # 如果data/industry_info/all_search_results.json存在，则读取
         search_results_path = os.path.join(self.m.industry_dir, "all_search_results.json")
         if os.path.exists(search_results_path):
@@ -95,10 +100,23 @@ class FinancialActionToolset:
                 return json.load(f)
         
         # 否则进行搜索
-        companies = [self.p.company] + [c['name'] for c in context.get("all_companies", [])]
+        companies = [self.p.get_config()['company']] + [c['company'] for c in context.get("all_companies", [])]
         results = {}
-        for name in companies:
-            r = DDGS().text(f"{name} 市场份额 行业分析", region="cn-zh", max_results=5)
-            results[name] = r
+        for company in companies:
+            r = SearchEngine(engine).search(f"{company} 市场份额 行业分析", max_results=10)
+            results[company] = r
+            # 拼接所有描述
+            # all_desc = "\n".join([item['description'] for item in r if 'description' in item])
+            # # 用LLM生成摘要
+            # summary = self.llm.call(f"请用中文简要总结以下关于{company}的行业市场份额和竞争地位信息：\n{all_desc}", system_prompt="你是行业分析专家")
+            # results[company] = {
+            #     "search_results": r,
+            #     "summary": summary
+            # }
             time.sleep(random.randint(5, 10))
+
+        # 确保目录存在
+        os.makedirs(self.m.industry_dir, exist_ok=True)
+        with open(search_results_path, 'w', encoding='utf-8') as f:
+            json.dump(results, f, ensure_ascii=False, indent=2)
         return results

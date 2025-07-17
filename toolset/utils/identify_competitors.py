@@ -36,21 +36,21 @@ def identify_competitors_with_ai(api_key,
     请用```yaml包围你的输出内容。输出格式示例：
     ```yaml
     competitors:
-      - name: "云从科技"
+      - company: "云从科技"
         code: "688327"
         market: "A股"
-      - name: "寒武纪"
+      - company: "寒武纪"
         code: "688256"
         market: "A股"
-      - name: "百度"
+      - company: "百度"
         code: "09888"
         market: "港股"
-      - name: "科大讯飞"
+      - company: "科大讯飞"
         code: "002230"
         market: "A股"
       - name: "某AI初创公司"
         code: ""
-        market: "未上市"
+        market: ""
     ```
     """
     # 正确的客户端创建方式

@@ -1,5 +1,79 @@
 identity: "你是 Agent_D，一个负责金融数据采集的智能代理。你的职责是为目标公司获取竞争对手、财务报表、基本信息、股东结构和行业信息。你只能使用以下函数："
 
+company_report_template:
+  meta:
+    title: "{{公司名称}} 投资分析报告"
+    date: "{{生成日期}}"
+    author: "自动生成系统"
+    company: "{{公司名称}}"
+    market: "{{所属市场}}"
+    stock_code: "{{股票代码}}"
+
+  sections:
+    - id: basic_info
+      title: 公司概况
+      content_type: text
+      description: 介绍公司名称、成立时间、主营业务、所属行业、市场地位等。
+      agent_role: data_agent
+
+    - id: shareholder_structure
+      title: 股东结构与治理分析
+      content_type: text_table
+      description: 提取主要股东、董事会成员结构，结合 LLM 分析治理情况。
+      agent_role: data_agent
+
+    - id: financial_analysis
+      title: 财务表现分析
+      content_type: table_chart_text
+      description: 对收入、利润、毛利率、净利率、ROE、资产负债率等指标进行分析，并以图表展示。
+      agent_role: analysis_agent
+      inputs:
+        - 财务报表（利润表、资产负债表、现金流量表）
+
+    - id: peer_comparison
+      title: 同行业对比分析
+      content_type: table_chart_text
+      description: 将目标公司与同类上市公司在关键财务指标上进行横向比较。
+      agent_role: analysis_agent
+      inputs:
+        - 同行业公司财务数据
+        - 财务指标计算结果
+
+    - id: valuation
+      title: 估值建模与预测
+      content_type: model_output + explanation
+      description: 基于市盈率/市净率模型或DCF模型估算合理估值，并进行敏感性分析。
+      agent_role: analysis_agent
+      inputs:
+        - 财务预测数据
+        - 行业估值倍数
+
+    - id: news_and_industry
+      title: 行业与舆情信息
+      content_type: text_list
+      description: 汇总公开信息中与公司相关的行业分析、市场舆论与动态事件。
+      agent_role: recall_agent
+      inputs:
+        - duckduckgo 搜索结果
+        - 行业报告片段
+
+    - id: investment_opinion
+      title: 投资建议与风险提示
+      content_type: opinion + risk_list
+      description: LLM 根据数据分析生成投资建议，并指出潜在风险，如行业波动、政策风险等。
+      agent_role: text_generator_agent
+      inputs:
+        - 财务与行业分析摘要
+        - 舆情分析与模型估值
+
+    - id: appendix
+      title: 数据来源与附录
+      content_type: reference_list
+      description: 自动汇总所有使用的数据、来源、接口与模型参数说明。
+      agent_role: system
+
+
+
 tools:
   - name: get_competitor_listed_companies
     usage: 获取目标公司的已上市竞争对手列表。
