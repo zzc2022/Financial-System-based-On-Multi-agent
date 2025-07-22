@@ -15,6 +15,7 @@ class BaseAgent:
 
         while True:
             next_step = self.planner.decide_next_step(context, completed, failed, self.toolset)
+            # next_step = "analyze_companies_in_directory"
             if next_step == "done":
                 break
 

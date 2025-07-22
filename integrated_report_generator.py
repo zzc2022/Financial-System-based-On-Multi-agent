@@ -18,18 +18,27 @@ from dotenv import load_dotenv
 import importlib
 from urllib.parse import urlparse
 
-from data_analysis_agent import quick_analysis
-from data_analysis_agent.config.llm_config import LLMConfig
-from data_analysis_agent.utils.llm_helper import LLMHelper
-from utils.get_shareholder_info import get_shareholder_info, get_table_content
-from utils.get_financial_statements import get_all_financial_statements, save_financial_statements_to_csv
-from utils.identify_competitors import identify_competitors_with_ai
-from utils.get_stock_intro import get_stock_intro, save_stock_intro_to_txt
+# from data_analysis_agent import quick_analysis
+from config.llm_config import LLMConfig
+from utils.llm_helper import LLMHelper
+from toolset.utils.get_shareholder_info import get_shareholder_info, get_table_content
+from toolset.utils.get_financial_statements import get_all_financial_statements, save_financial_statements_to_csv
+from toolset.utils.identify_competitors import identify_competitors_with_ai
+from toolset.utils.get_stock_intro import get_stock_intro, save_stock_intro_to_txt
 from duckduckgo_search import DDGS
-from utils.search_engine import SearchEngine
+from toolset.utils.search_engine import SearchEngine
+# from data_analysis_agent import DataAnalysisAgent
+from toolset.utils.create_session_dir import create_session_output_dir
+from toolset.utils.code_executor import CodeExecutor
+from toolset.utils.extract_code import extract_code_from_response
+from toolset.utils.format_execution_result import format_execution_result
+from toolset.utils.code_executor import CodeExecutor
+from typing import List, Dict, Any, Optional
+from prompts.planner.prompts import data_analysis_system_prompt, final_report_system_prompt,final_report_system_prompt_absolute
+
 
 class IntegratedResearchReportGenerator:
-    """整合的研报生成器类"""
+    """整合的研报生成器类"""    
     
     def __init__(self, target_company="商汤科技", target_company_code="00020", target_company_market="HK", search_engine="ddg"):
         # 环境变量与全局配置
@@ -51,6 +60,7 @@ class IntegratedResearchReportGenerator:
         self.data_dir = "./download_financial_statement_files"
         self.company_info_dir = "./company_info"
         self.industry_info_dir = "./industry_info"
+        self.absolute_path = False
         
         # 创建必要的目录
         for dir_path in [self.data_dir, self.company_info_dir, self.industry_info_dir]:
@@ -75,9 +85,6 @@ class IntegratedResearchReportGenerator:
         print("🚀 开始第一阶段：数据采集与基础分析")
         print("="*80)
         
-
-        # 1~5 阶段调用agent_data
-        '''
         # 1. 获取竞争对手列表
         print("🔍 识别竞争对手...")
         other_companies = identify_competitors_with_ai(
@@ -203,10 +210,8 @@ class IntegratedResearchReportGenerator:
         search_results_file = os.path.join(self.industry_info_dir, "all_search_results.json")
         with open(search_results_file, 'w', encoding='utf-8') as f:
             json.dump(all_search_results, f, ensure_ascii=False, indent=2)
-        '''
         
-        # 6~7 阶段调用agent_analysis
-        '''# 6. 运行财务分析
+        # 6. 运行财务分析
         print("\n📈 运行财务分析...")
         
         # 单公司分析
@@ -287,11 +292,9 @@ class IntegratedResearchReportGenerator:
             'sensetime_valuation_report': sensetime_valuation_report
         }
         
-        return md_output_file'''
+        return md_output_file
     
     def stage2_deep_report_generation(self, md_file_path):
-        # 调用agent_report
-        
         """第二阶段：深度研报生成"""
         print("\n" + "="*80)
         print("🚀 开始第二阶段：深度研报生成")
@@ -363,6 +366,443 @@ class IntegratedResearchReportGenerator:
         return md_file, final_report
 
     # ========== 辅助方法（从原始脚本移植） ==========
+    # 便捷函数
+    # def create_agent(self, llm_config=None, output_dir="outputs", max_rounds=30,absolute_path=False):
+    #     """
+    #     创建一个数据分析智能体实例
+        
+    #     Args:
+    #         config: LLM配置，如果为None则使用默认配置
+    #         output_dir: 输出目录
+    #         max_rounds: 最大分析轮数
+    #         session_dir: 指定会话目录（可选，此参数暂不支持）
+            
+    #     Returns:
+    #         DataAnalysisAgent: 智能体实例
+    #     """
+    #     if llm_config is None:
+    #         llm_config = LLMConfig()
+    #     return DataAnalysisAgent(llm_config=llm_config, output_dir=output_dir, max_rounds=max_rounds,absolute_path=absolute_path)
+
+    def _process_response(self, response: str) -> Dict[str, Any]:
+        """
+        统一处理LLM响应，判断行动类型并执行相应操作
+        
+        Args:
+            response: LLM的响应内容
+            
+        Returns:
+            处理结果字典
+        """
+        try:
+            yaml_data = self.llm.parse_yaml_response(response)
+            action = yaml_data.get('action', 'generate_code')
+            
+            print(f"🎯 检测到动作: {action}")
+            
+            if action == 'analysis_complete':
+                return self._handle_analysis_complete(response, yaml_data)
+            elif action == 'collect_figures':
+                return self._handle_collect_figures(response, yaml_data)
+            elif action == 'generate_code':
+                return self._handle_generate_code(response, yaml_data)
+            else:
+                print(f"⚠️ 未知动作类型: {action}，按generate_code处理")
+                return self._handle_generate_code(response, yaml_data)
+                
+        except Exception as e:
+            print(f"⚠️ 解析响应失败: {str(e)}，按generate_code处理")
+            return self._handle_generate_code(response, {})
+    
+    def _handle_analysis_complete(self, response: str, yaml_data: Dict[str, Any]) -> Dict[str, Any]:
+        """处理分析完成动作"""
+        print("✅ 分析任务完成")
+        final_report = yaml_data.get('final_report', '分析完成，无最终报告')
+        return {
+            'action': 'analysis_complete',
+            'final_report': final_report,
+            'response': response,
+            'continue': False
+        }
+    
+    def _handle_collect_figures(self, response: str, yaml_data: Dict[str, Any]) -> Dict[str, Any]:
+        """处理图片收集动作"""
+        print("📊 开始收集图片")
+        figures_to_collect = yaml_data.get('figures_to_collect', [])
+        
+        collected_figures = []
+        
+        for figure_info in figures_to_collect:
+            figure_number = figure_info.get('figure_number')
+            filename = figure_info.get('filename', f'figure_{figure_number}.png')
+            file_path = figure_info.get('file_path', '')  # 获取具体的文件路径
+            description = figure_info.get('description', '')
+            analysis = figure_info.get('analysis', '')
+            
+            print(f"📈 收集图片 {figure_number}: {filename}")
+            print(f"   📂 路径: {file_path}")
+            print(f"   📝 描述: {description}")
+            print(f"   🔍 分析: {analysis}")
+            
+            # 只保留真实存在的图片
+            if file_path and os.path.exists(file_path):
+                print(f"   ✅ 文件存在: {file_path}")
+                collected_figures.append({
+                    'figure_number': figure_number,
+                    'filename': filename,
+                    'file_path': file_path,
+                    'description': description,
+                    'analysis': analysis
+                })
+            elif file_path:
+                print(f"   ⚠️ 文件不存在: {file_path}，已跳过该图片")
+            else:
+                print(f"   ⚠️ 未提供文件路径，已跳过该图片")
+        
+        
+        return {
+            'action': 'collect_figures',
+            'collected_figures': collected_figures,
+            'response': response,  # response 仍然原样保留，若需彻底净化可进一步处理
+            'continue': True
+        }
+
+    def _handle_generate_code(self, response: str, yaml_data: Dict[str, Any]) -> Dict[str, Any]:
+        """处理代码生成和执行动作"""
+        code = yaml_data.get('code', '')
+        if not code:
+            code = extract_code_from_response(response)
+        if code:
+            print(f"🔧 执行代码:\n{code}")
+            print("-" * 40)
+            result = self.executor.execute_code(code)
+            feedback = format_execution_result(result)
+            print(f"📋 执行反馈:\n{feedback}")
+            # 检查代码执行结果中是否有图片生成但文件不存在的情况
+            # 假设图片保存路径会在 result['output'] 或 result['figures'] 里体现
+            # 如果检测到图片文件不存在，建议用户重新分析
+            missing_figures = []
+            output = result.get('output', '')
+            # 简单正则或字符串查找图片路径并判断是否存在
+            import re
+            img_paths = re.findall(r'(?:[\w./\\-]+\.(?:png|jpg|jpeg|svg))', str(output))
+            for img_path in img_paths:
+                if not os.path.isabs(img_path):
+                    abs_path = os.path.join(self.session_output_dir, img_path)
+                else:
+                    abs_path = img_path
+                if not os.path.exists(abs_path):
+                    missing_figures.append(img_path)
+            if missing_figures:
+                feedback += f"\n⚠️ 检测到以下图片未生成成功: {missing_figures}\n建议重新分析本轮或修正代码后再试。"
+                # 可以在这里返回一个特殊标志，供 analyze 主流程判断是否需要重启分析
+                return {
+                    'action': 'generate_code',
+                    'code': code,
+                    'result': result,
+                    'feedback': feedback,
+                    'response': response,
+                    'continue': False,  # 终止本轮分析
+                    'need_restart': True,
+                    'missing_figures': missing_figures
+                }
+            return {
+                'action': 'generate_code',
+                'code': code,
+                'result': result,
+                'feedback': feedback,
+                'response': response,
+                'continue': True
+            }
+        else:
+            print("⚠️ 未从响应中提取到可执行代码，要求LLM重新生成")
+            return {
+                'action': 'invalid_response',
+                'error': '响应中缺少可执行代码',
+                'response': response,
+                'continue': True
+            }
+
+    def _build_conversation_prompt(self) -> str:
+        """构建对话提示词"""
+        prompt_parts = []
+        
+        for msg in self.conversation_history:
+            role = msg['role']
+            content = msg['content']
+            if role == 'user':
+                prompt_parts.append(f"用户: {content}")
+            else:
+                prompt_parts.append(f"助手: {content}")
+        
+        return "\n\n".join(prompt_parts)
+    
+    def _generate_final_report(self, analysis_results:List[Dict[str, Any]]) -> Dict[str, Any]:
+        """生成最终分析报告"""
+        # 收集所有生成的图片信息
+        all_figures = []
+        for result in analysis_results:
+            if result.get('action') == 'collect_figures':
+                all_figures.extend(result.get('collected_figures', []))
+        
+        print(f"\n📊 开始生成最终分析报告...")
+        print(f"📂 输出目录: {self.session_output_dir}")
+        print(f"🔢 总轮数: {self.current_round}")
+        print(f"📈 收集图片: {len(all_figures)} 个")
+        
+        # 构建用于生成最终报告的提示词
+        final_report_prompt = self._build_final_report_prompt(all_figures, analysis_results)
+        
+        # 调用LLM生成最终报告
+        response = self.llm.call(
+            prompt=final_report_prompt,
+            system_prompt="你将会接收到一个数据分析任务的最终报告请求，请根据提供的分析结果和图片信息生成完整的分析报告。",
+            max_tokens=8192  
+        )
+        
+        # 解析响应，提取最终报告
+        try:
+            yaml_data = self.llm.parse_yaml_response(response)
+            if yaml_data.get('action') == 'analysis_complete':
+                final_report_content = yaml_data.get('final_report', '报告生成失败')
+            else:
+                final_report_content = "LLM未返回analysis_complete动作，报告生成失败"
+        except:
+            # 如果解析失败，直接使用响应内容
+            final_report_content = response
+        
+        print("✅ 最终报告生成完成")
+        # 手动添加附件清单到报告末尾
+        if all_figures:
+            appendix_section = "\n\n## 附件清单\n\n"
+            appendix_section += "本报告包含以下图片附件：\n\n"
+            
+            for i, figure in enumerate(all_figures, 1):
+                filename = figure.get('filename', '未知文件名')
+                description = figure.get('description', '无描述')
+                analysis = figure.get('analysis', '无分析')
+                file_path = figure.get('file_path', '')
+                
+                appendix_section += f"{i}. **{filename}**\n"
+                appendix_section += f"   - 描述：{description}\n"
+                appendix_section += f"   - 细节分析：{analysis}\n"
+                if self.absolute_path:
+                    appendix_section += f"   - 文件路径：{file_path}\n"
+                else:
+                    appendix_section += f"   - 文件路径：./{filename}\n"
+                appendix_section += "\n"
+            
+            # 将附件清单添加到报告内容末尾
+            final_report_content += appendix_section
+        
+        # 保存最终报告到文件
+        report_file_path = os.path.join(self.session_output_dir, "最终分析报告.md")
+        try:
+            with open(report_file_path, 'w', encoding='utf-8') as f:
+                f.write(final_report_content)
+            print(f"📄 最终报告已保存至: {report_file_path}")
+            if all_figures:
+                print(f"📎 已添加 {len(all_figures)} 个图片的附件清单")
+        except Exception as e:
+            print(f"❌ 保存报告文件失败: {str(e)}")
+        
+        # 返回完整的分析结果
+        return {
+            'session_output_dir': self.session_output_dir,
+            'total_rounds': self.current_round,
+            'analysis_results': analysis_results,
+            'collected_figures': all_figures,
+            'conversation_history': self.conversation_history,
+            'final_report': final_report_content,
+            'report_file_path': report_file_path       
+            }
+
+    def _build_final_report_prompt(self, all_figures: List[Dict[str, Any]], analysis_results:List[Dict[str, Any]]) -> str:
+        """构建用于生成最终报告的提示词"""
+        
+        # 构建图片信息摘要，使用相对路径
+        figures_summary = ""
+        if all_figures:
+            figures_summary = "\n生成的图片及分析:\n"
+            for i, figure in enumerate(all_figures, 1):
+                filename = figure.get('filename', '未知文件名')
+                # 使用相对路径格式，适合在报告中引用
+                relative_path = f"./{filename}"
+                figures_summary += f"{i}. {filename}\n"
+                figures_summary += f"   路径: {relative_path}\n"
+                figures_summary += f"   描述: {figure.get('description', '无描述')}\n"
+                figures_summary += f"   分析: {figure.get('analysis', '无分析')}\n\n"
+        else:
+            figures_summary = "\n本次分析未生成图片。\n"
+        
+        # 构建代码执行结果摘要（仅包含成功执行的代码块）
+        code_results_summary = ""
+        success_code_count = 0
+        for result in analysis_results:
+            if result.get('action') != 'collect_figures' and result.get('code'):
+                exec_result = result.get('result', {})
+                if exec_result.get('success'):
+                    success_code_count += 1
+                    code_results_summary += f"代码块 {success_code_count}: 执行成功\n"
+                    if exec_result.get('output'):
+                        code_results_summary += f"输出: {exec_result.get('output')[:]}\n\n"
+
+        
+        # 使用 prompts.py 中的统一提示词模板，并添加相对路径使用说明
+        pre_prompt = final_report_system_prompt_absolute if self.absolute_path else final_report_system_prompt
+        prompt = pre_prompt.format(
+            current_round=self.current_round,
+            session_output_dir=self.session_output_dir,
+            figures_summary=figures_summary,
+            code_results_summary=code_results_summary
+        )
+        
+        return prompt
+
+
+    def analyze(self, user_input: str, files:Optional[List[str]] = None, max_rounds=6) -> Dict[str, Any]:
+        """
+        开始分析流程
+        
+        Args:
+            user_input: 用户的自然语言需求
+            files: 数据文件路径列表
+            
+        Returns:
+            分析结果字典
+        """
+        # 重置状态
+        self.conversation_history = []
+        self.analysis_results = []
+        self.current_round = 0
+        base_output_dir = "outputs"
+
+        if files is None:
+            files = []
+        
+        # 创建本次分析的专用输出目录
+        self.session_output_dir = create_session_output_dir(base_output_dir, user_input)
+        
+        # 初始化代码执行器，使用会话目录
+        self.executor = CodeExecutor(self.session_output_dir)
+        
+        # 设置会话目录变量到执行环境中
+        self.executor.set_variable('session_output_dir', self.session_output_dir)
+        
+        # 构建初始prompt
+        initial_prompt = f"""用户需求: {user_input}"""
+        if files:
+            initial_prompt += f"\n数据文件: {', '.join(files)}"
+        
+        print(f"🚀 开始数据分析任务")
+        print(f"📝 用户需求: {user_input}")
+        if files:
+            print(f"📁 数据文件: {', '.join(files)}")
+        print(f"📂 输出目录: {self.session_output_dir}")
+        print(f"🔢 最大轮数: {max_rounds}")
+        print("=" * 60)
+          # 添加到对话历史
+        self.conversation_history.append({
+            'role': 'user',
+            'content': initial_prompt
+        })
+        
+        while self.current_round < max_rounds:
+            self.current_round += 1
+            print(f"\n🔄 第 {self.current_round} 轮分析")
+              # 调用LLM生成响应
+            try:                
+                # 获取当前执行环境的变量信息
+                notebook_variables = self.executor.get_environment_info()
+                
+                # 格式化系统提示词，填入动态的notebook变量信息
+                formatted_system_prompt = data_analysis_system_prompt.format(
+                    notebook_variables=notebook_variables
+                )
+                
+                response = self.llm.call(
+                    prompt=self._build_conversation_prompt(),
+                    system_prompt=formatted_system_prompt
+                )
+                
+                print(f"🤖 助手响应:\n{response}")
+                
+                # 使用统一的响应处理方法
+                process_result = self._process_response(response)
+                
+                # 根据处理结果决定是否继续
+                if not process_result.get('continue', True):
+                    print(f"\n✅ 分析完成！")
+                    break
+                
+                # 添加到对话历史
+                self.conversation_history.append({
+                    'role': 'assistant',
+                    'content': response
+                })
+                
+                # 根据动作类型添加不同的反馈
+                if process_result['action'] == 'generate_code':
+                    feedback = process_result.get('feedback', '')
+                    self.conversation_history.append({
+                        'role': 'user',
+                        'content': f"代码执行反馈:\n{feedback}"
+                    })
+                    
+                    # 记录分析结果
+                    self.analysis_results.append({
+                        'round': self.current_round,
+                        'code': process_result.get('code', ''),
+                        'result': process_result.get('result', {}),
+                        'response': response
+                    })                
+                elif process_result['action'] == 'collect_figures':
+                    # 记录图片收集结果
+                    collected_figures = process_result.get('collected_figures', [])
+                    filtered_figures_to_collect = process_result.get('filtered_figures_to_collect', [])
+                    feedback = f"已收集 {len(collected_figures)} 个图片及其分析"
+                    self.conversation_history.append({
+                        'role': 'user', 
+                        'content': f"图片收集反馈:\n{feedback}\n请继续下一步分析。"
+                    })
+                    # 只记录过滤后的图片记忆
+                    self.analysis_results.append({
+                        'round': self.current_round,
+                        'action': 'collect_figures',
+                        'collected_figures': collected_figures,
+                        'filtered_figures_to_collect': filtered_figures_to_collect,
+                        'response': response
+                    })
+           
+            except Exception as e:
+                error_msg = f"LLM调用错误: {str(e)}"
+                print(f"❌ {error_msg}")
+                self.conversation_history.append({
+                    'role': 'user',
+                    'content': f"发生错误: {error_msg}，请重新生成代码。"
+                })
+        # 生成最终总结
+        if self.current_round >= max_rounds:
+            print(f"\n⚠️ 已达到最大轮数 ({max_rounds})，分析结束")
+        
+        return self._generate_final_report(self.analysis_results)
+
+
+    def quick_analysis(self, query,files=None, llm_config=None, output_dir="outputs", max_rounds=10,absolute_path=False):
+        """
+        快速数据分析函数
+        
+        Args:
+            query: 分析需求（自然语言）
+            files: 数据文件路径列表
+            output_dir: 输出目录
+            max_rounds: 最大分析轮数
+            
+        Returns:
+            dict: 分析结果
+        """
+        # agent = self.create_agent(llm_config=llm_config, output_dir=output_dir, max_rounds=max_rounds, absolute_path=absolute_path)
+        return self.analyze(query, files or [], max_rounds=max_rounds)
     
     def get_company_infos(self, data_dir="./company_info"):
         """获取公司信息"""
@@ -390,7 +830,7 @@ class IntegratedResearchReportGenerator:
         """分析单个公司"""
         if query is None:
             query = "基于表格的数据，分析有价值的内容，并绘制相关图表。最后生成汇报给我。"
-        report = quick_analysis(
+        report = self.quick_analysis(
             query=query, files=files, llm_config=llm_config, 
             absolute_path=True, max_rounds=20
         )
@@ -421,7 +861,7 @@ class IntegratedResearchReportGenerator:
         """比较两个公司"""
         query = "基于两个公司的表格的数据，分析有共同点的部分，绘制对比分析的表格，并绘制相关图表。最后生成汇报给我。"
         all_files = company1_files + company2_files
-        report = quick_analysis(
+        report = self.quick_analysis(
             query=query,
             files=all_files,
             llm_config=llm_config,
@@ -475,7 +915,7 @@ class IntegratedResearchReportGenerator:
     def analyze_sensetime_valuation(self, files, llm_config):
         """分析商汤科技的估值与预测"""
         query = "基于三大表的数据，构建估值与预测模型，模拟关键变量变化对财务结果的影响,并绘制相关图表。最后生成汇报给我。"
-        report = quick_analysis(
+        report = self.quick_analysis(
             query=query, files=files, llm_config=llm_config, absolute_path=True, max_rounds=20
         )
         return report

@@ -1,0 +1,137 @@
+tools:
+  - name: get_competitor_listed_companies
+    usage: 获取目标公司的已上市竞争对手列表。
+    output_example: |
+      [
+        {"name": "百度", "code": "00001", "market": "HK"},
+        {"name": "阿里巴巴", "code": "9988", "market": "HK"}
+      ]
+    extra: 这个函数必须第一个执行，且需要有10个结果。
+
+  - name: get_all_financial_data
+    usage: 获取目标公司及其竞争对手的年度财务报表。
+    output_example: "[结构化数据列表，每个公司一个JSON对象]"
+
+  - name: get_all_company_info
+    usage: 获取公司简介（包括业务描述和背景信息）。
+    output_example: |
+      【公司信息开始】
+      公司名称: 商汤科技
+      商汤科技是一家人工智能软件公司，专注于计算机视觉和深度学习......
+      【公司信息结束】
+
+  - name: get_shareholder_analysis
+    usage: 获取并分析公司股东结构，输出自然语言分析。
+    output_example: "前五大股东持股比例为72.1%，机构投资者占比较高。"
+
+  - name: search_industry_info
+    usage: 搜索并汇总与行业地位、市场份额、业务模式等相关的互联网信息。
+    output_example: "[结构化搜索结果，每个公司一个搜索结果列表]"
+
+  - name: get_all_financial_data
+    usage: 获取目标公司及其竞争对手的年度财务报表。
+    output_example: "[结构化数据列表，每个公司一个JSON对象]"
+
+  - name: get_all_company_info
+    usage: 获取公司简介（包括业务描述和背景信息）。
+    output_example: |
+      【公司信息开始】
+      公司名称: 商汤科技
+      商汤科技是一家人工智能软件公司，专注于计算机视觉和深度学习......
+      【公司信息结束】
+
+  - name: get_shareholder_analysis
+    usage: 获取并分析公司股东结构，输出自然语言分析。
+    output_example: "前五大股东持股比例为72.1%，机构投资者占比较高。"
+
+  - name: search_industry_info
+    usage: 搜索并汇总与行业地位、市场份额、业务模式等相关的互联网信息。
+    output_example: "[结构化搜索结果，每个公司一个搜索结果列表]"
+
+  - name: analyze_companies_in_directory
+    usage: 分析指定目录下所有公司的财务数据，生成个体分析报告和图表。
+    output_example: |
+      {
+        "商汤科技": {"final_report": "基于财务数据的深度分析报告..."},
+        "百度": {"final_report": "竞争对手财务状况分析..."}
+      }
+    extra: 基于CSV财务数据文件进行深度分析，包含图表生成。
+
+  - name: run_comparison_analysis
+    usage: 运行目标公司与各竞争对手的一对一财务对比分析。
+    output_example: |
+      {
+        "商汤科技_vs_百度": {
+          "company1": "商汤科技",
+          "company2": "百度", 
+          "report": "两公司财务对比分析报告..."
+        }
+      }
+    extra: 生成对比分析表格和图表，突出竞争优劣势。
+
+  - name: merge_reports
+    usage: 合并个体分析报告和对比分析报告为统一格式。
+    output_example: |
+      {
+        "商汤科技": "个体分析报告内容...",
+        "商汤科技_vs_百度": "对比分析报告内容..."
+      }
+    extra: 整合所有分析结果，便于后续处理。
+
+  - name: evaluation
+    usage: 针对目标公司构建估值与预测模型，进行情景分析。
+    output_example: |
+      {
+        "final_report": "基于DCF/PE等方法的估值模型分析，包含敏感性分析和预测图表..."
+      }
+    extra: 专门针对商汤科技进行深度估值建模和未来预测。
+
+  - name: get_analysis_report
+    usage: 整合所有分析结果，生成最终的综合研究报告markdown文件。
+    output_example: "财务研报汇总_20231218_143052.md"
+    extra: 包含公司信息、股权分析、行业信息、财务分析和估值预测的完整报告。
+
+  - name: deep_report_generation
+    usage: 深度生成财务研报，包含公司概况、财务分析和投资建议等章节。
+    output_example: "深度财务研报分析_20250722.docx"
+    extra: |
+      1. 该函数会自动生成报告大纲和各章节内容。  
+      2. 最终报告将保存为 Markdown 格式，并转换为 Word 文档。  
+      3. 依赖外部工具进行格式化和转换，若缺少应提供友好提示。
+      4. 该函数必须在所有前置准备（get_analysis_report）完成后调用。
+
+  - name: prepare_report_assets
+    usage: 提取基础 Markdown 报告中的图片，统一保存至 images 目录，并生成清洗后的新报告。
+    params:
+      - md_file_path: 初始 Markdown 报告路径（string）
+    output_example: "./财务研报汇总_images.md"
+    extra: |
+      1. 本函数必须作为第一步调用。  
+      2. 不存在的图片会被剔除，其引用语法会从 Markdown 中移除。  
+      3. 所有图片路径会重写为 ./images/xxx.png 相对路径，便于后续转换为 Word。
+
+  - name: generate_full_report_sections
+    usage: 基于整理后的报告内容和图片，生成每个章节的 markdown 文本。
+    params:
+      - md_path: 已清洗并重新引用图片的 markdown 文件路径（string）
+    output_example: |
+      [
+        "## 公司概况\n商汤科技成立于...",
+        "## 财务分析\n收入增长率为...",
+        "## 投资建议\n我们建议增持..."
+      ]
+    extra: |
+      1. 函数会调用 LLM 自动生成大纲和各章节内容。  
+      2. 所有章节以 markdown 格式返回，调用方负责保存与拼接。  
+      3. 最后一章将自动追加 “引用文献” 部分。
+
+  - name: finalize_report_output
+    usage: 将所有章节内容合并保存为 Markdown 文件，并格式化、转换为 Word。
+    params:
+      - sections: markdown 格式的章节内容列表（List[str]）
+    output_example: "./深度财务研报分析_20250722.docx"
+    extra: |
+      1. 函数内部自动生成文件名，按时间戳命名。  
+      2. 使用 mdformat 进行格式化，使用 pandoc 生成 Word 文档。  
+      3. 依赖外部工具，若缺少应提供友好提示。
+

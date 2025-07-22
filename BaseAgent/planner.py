@@ -3,7 +3,7 @@ from typing import Dict, Any, List
 from utils.prompt_manager import PromptManager
 
 class AgentPlanner:
-    def __init__(self, profile, llm, prompt_path="prompts/planner/agent_d.yaml"):
+    def __init__(self, profile, llm, prompt_path="prompts/planner/toolset_illustration.yaml"):
         self.profile = profile
         self.llm = llm
         self.prompt_manager = PromptManager()
@@ -17,13 +17,18 @@ class AgentPlanner:
             else:
                 context_summary += f"【{k}】[结构化数据]\n"
 
+        if self.profile.name == "AnalysisAgent":
+            task = "请规划分析阶段的图表生成、两两对比、估值建模等任务"
+        else:
+            task = f"请规划获取 {self.profile.get_identity()} 的基础信息、竞争者和财务信息。"
+
         # Load system prompt from YAML file
-        system_prompt = self.prompt_manager.load_system_prompt(self.prompt_path)
+        system_prompt = self.prompt_manager.load_system_prompt(self.prompt_path, self.profile.name)
         # Prepare the prompt for the LLM
         user_prompt = self.prompt_manager.render_user_prompt(
             "user_prompt.jinja", {
                 "profile": self.profile,
-                "task": f"请规划获取 {self.profile.get_identity()} 的基础信息、竞争者和财务信息。",
+                "task": task,
                 "context": context,
                 "completed": completed,
                 "failed": failed

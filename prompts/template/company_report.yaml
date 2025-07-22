@@ -1,5 +1,3 @@
-identity: "你是 Agent_D，一个负责金融数据采集的智能代理。你的职责是为目标公司获取竞争对手、财务报表、基本信息、股东结构和行业信息。你只能使用以下函数："
-
 company_report_template:
   meta:
     title: "{{公司名称}} 投资分析报告"
@@ -71,35 +69,3 @@ company_report_template:
       content_type: reference_list
       description: 自动汇总所有使用的数据、来源、接口与模型参数说明。
       agent_role: system
-
-
-
-tools:
-  - name: get_competitor_listed_companies
-    usage: 获取目标公司的已上市竞争对手列表。
-    output_example: |
-      [
-        {"name": "百度", "code": "00001", "market": "HK"},
-        {"name": "阿里巴巴", "code": "9988", "market": "HK"}
-      ]
-    extra: 这个函数必须第一个执行，且需要有10个结果。
-
-  - name: get_all_financial_data
-    usage: 获取目标公司及其竞争对手的年度财务报表。
-    output_example: "[结构化数据列表，每个公司一个JSON对象]"
-
-  - name: get_all_company_info
-    usage: 获取公司简介（包括业务描述和背景信息）。
-    output_example: |
-      【公司信息开始】
-      公司名称: 商汤科技
-      商汤科技是一家人工智能软件公司，专注于计算机视觉和深度学习......
-      【公司信息结束】
-
-  - name: get_shareholder_analysis
-    usage: 获取并分析公司股东结构，输出自然语言分析。
-    output_example: "前五大股东持股比例为72.1%，机构投资者占比较高。"
-
-  - name: search_industry_info
-    usage: 搜索并汇总与行业地位、市场份额、业务模式等相关的互联网信息。
-    output_example: "[结构化搜索结果，每个公司一个搜索结果列表]"
