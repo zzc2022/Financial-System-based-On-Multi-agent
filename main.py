@@ -2,6 +2,7 @@ from BaseAgent.base_agent import BaseAgent
 from BaseAgent.profile import AgentProfile
 from BaseAgent.memory import AgentMemory
 from BaseAgent.planner import AgentPlanner
+from BaseAgent.coordinator_agent import CoordinatorAgent
 from toolset.action_financial import FinancialActionToolset
 from config.llm_config import LLMConfig
 from config.embedding_config import create_embedding_config
@@ -52,13 +53,10 @@ action = FinancialActionToolset(data_agent_profile, memory, llm, llm_config)
 
 toolset = [fn for fn in dir(action) if not fn.startswith("__") and callable(getattr(action, fn))]
 
+# 创建数据提取agent（不立即运行）
 agent_d = BaseAgent(data_agent_profile, memory, planner, action, toolset)
 
-result = agent_d.run()
-
-for k, v in result.items():
-    print(f"[{k}]\n{v if isinstance(v, str) else '[结构化数据]'}")
-
+##### 分析Agent #####
 analysis_agent_profile = AgentProfile(
     name="AnalysisAgent",
     role="负责数据分析、图表生成、公司估值",
@@ -74,6 +72,7 @@ analysis_agent_profile = AgentProfile(
     config={"company": "商汤科技", "code": "00020", "market": "HK"}
 )
 
+# 创建分析agent（不立即运行）
 agent_a = BaseAgent(
     profile=analysis_agent_profile,
     memory=memory,
@@ -82,9 +81,63 @@ agent_a = BaseAgent(
     toolset=["analyze_companies_in_directory", "run_comparison_analysis", "merge_reports", "evaluation", "get_analysis_report", "deep_report_generation"]
 )
 
-result_a = agent_a.run()
-for k, v in result_a.items():
-    print(f"[{k}]\n{v if isinstance(v, str) else '[结构化数据]'}")
+##### Coordinator Agent #####
+coordinator_profile = AgentProfile(
+    name="CoordinatorAgent",
+    role="负责多agent系统的调度、监控和全局记忆管理",
+    objectives=[
+        "管理和调度各个agent的执行顺序",
+        "监控项目整体进展和agent状态",
+        "提供全局记忆访问和知识检索",
+        "生成系统状态报告和执行摘要"
+    ],
+    tools=["analyze_global_progress", "decide_next_action", "execute_next_agent", 
+           "check_dependencies", "search_knowledge", "generate_status_report"],
+    knowledge="具备多agent系统调度经验，了解财务分析流程，掌握全局优化策略",
+    interaction={"input": "系统状态和agent信息", "output": "调度决策和状态报告"},
+    memory_type="global",
+    config={"company": "商汤科技", "code": "00020", "market": "HK", "workflow_type": "financial_analysis"}
+)
+
+# 创建coordinator agent
+coordinator = CoordinatorAgent(
+    profile=coordinator_profile,
+    memory=memory,
+    planner=AgentPlanner(coordinator_profile, llm),
+    llm=llm,
+    llm_config=llm_config
+)
+
+# 注册agent到coordinator，并设置依赖关系
+coordinator.register_agent(agent_d, dependencies=[])  # 数据agent没有依赖
+coordinator.register_agent(agent_a, dependencies=["DataAgent"])  # 分析agent依赖数据agent
+
+print("🎯 启动多Agent协调系统...")
+print("📊 Agent依赖关系: DataAgent -> AnalysisAgent")
+print("🚀 开始执行工作流程...\n")
+
+# 执行工作流程
+workflow_results = coordinator.execute_workflow()
+
+print("\n" + "="*50)
+print("📋 工作流程执行完成")
+print("="*50)
+
+# 显示各个agent的执行结果
+for agent_name, result in workflow_results.items():
+    print(f"\n🔍 {agent_name} 执行结果:")
+    if isinstance(result, dict):
+        for k, v in result.items():
+            print(f"  [{k}] {v if isinstance(v, str) else '[结构化数据]'}")
+    else:
+        print(f"  {result}")
+
+# 生成全局摘要报告
+print("\n" + "="*50)
+print("📊 系统执行摘要")
+print("="*50)
+global_summary = coordinator.get_global_summary()
+print(global_summary)
 
 # context_generator_profile = AgentProfile(
 #     name="ReportGenerationAgent",
