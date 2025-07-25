@@ -7,7 +7,21 @@
         "get_all_financial_data", 
         "get_all_company_info",
         "get_shareholder_analysis",
-        "search_industry_info"
+        "search_industry_info",
+        "get_industry_overview",
+        "get_industry_chain_analysis",
+        "get_industry_policy_impact",
+        "get_industry_technology_trends",
+        "get_industry_association_reports",
+        "get_industry_market_scale",
+        "get_leading_companies_data",
+        "get_gdp_data",
+        "get_cpi_data",
+        "get_interest_rate_data",
+        "get_exchange_rate_data",
+        "get_federal_reserve_data",
+        "get_policy_reports",
+        "get_macro_industry_impact"
       ]
     },
     "AnalysisAgent": {
@@ -18,7 +32,13 @@
         "merge_reports",
         "evaluation",
         "get_analysis_report",
-        "deep_report_generation"
+        "deep_report_generation",
+        "analyze_industry_structure",
+        "analyze_industry_trends",
+        "generate_industry_report",
+        "analyze_macro_trends",
+        "analyze_policy_impact",
+        "generate_macro_report"
       ]
     },
     "ReportGenerationAgent": {
@@ -34,12 +54,27 @@
       ]
     }
   },
+  "report_types": {
+    "company": {
+      "data_agent_identity": "你是专门负责公司研报数据收集的DataAgent。你需要收集目标公司及其竞争对手的财务数据、基本信息和行业信息。",
+      "analysis_agent_identity": "你是专门负责公司研报分析的AnalysisAgent。你需要分析公司财务数据，进行竞争对手对比，并完成估值建模。"
+    },
+    "industry": {
+      "data_agent_identity": "你是专门负责行业研报数据收集的DataAgent。你需要收集目标行业的概况、产业链、政策影响、技术趋势和市场规模等信息。",
+      "analysis_agent_identity": "你是专门负责行业研报分析的AnalysisAgent。你需要分析行业结构、发展趋势，并生成专业的行业研究报告。"
+    },
+    "macro": {
+      "data_agent_identity": "你是专门负责宏观经济研报数据收集的DataAgent。你需要收集GDP、CPI、利率、汇率等宏观经济数据和政策信息。",
+      "analysis_agent_identity": "你是专门负责宏观经济研报分析的AnalysisAgent。你需要分析宏观经济趋势、政策影响，并生成宏观经济研究报告。"
+    }
+  },
   "common_instructions": {
     "workflow_rules": [
       "严格按照工具列表执行任务",
       "每个步骤必须有明确的输出",
       "保持数据的一致性和准确性",
-      "遇到错误时提供详细的错误信息"
+      "遇到错误时提供详细的错误信息",
+      "根据研报类型选择合适的工具和方法"
     ],
     "output_format": {
       "success": "返回结构化数据或字符串结果",

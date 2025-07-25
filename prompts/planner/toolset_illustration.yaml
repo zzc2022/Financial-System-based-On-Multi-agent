@@ -1,4 +1,5 @@
 tools:
+  # ========== 公司研报工具 ==========
   - name: get_competitor_listed_companies
     usage: 获取目标公司的已上市竞争对手列表。
     output_example: |
@@ -7,26 +8,6 @@ tools:
         {"name": "阿里巴巴", "code": "9988", "market": "HK"}
       ]
     extra: 这个函数必须第一个执行，且需要有10个结果。
-
-  - name: get_all_financial_data
-    usage: 获取目标公司及其竞争对手的年度财务报表。
-    output_example: "[结构化数据列表，每个公司一个JSON对象]"
-
-  - name: get_all_company_info
-    usage: 获取公司简介（包括业务描述和背景信息）。
-    output_example: |
-      【公司信息开始】
-      公司名称: 商汤科技
-      商汤科技是一家人工智能软件公司，专注于计算机视觉和深度学习......
-      【公司信息结束】
-
-  - name: get_shareholder_analysis
-    usage: 获取并分析公司股东结构，输出自然语言分析。
-    output_example: "前五大股东持股比例为72.1%，机构投资者占比较高。"
-
-  - name: search_industry_info
-    usage: 搜索并汇总与行业地位、市场份额、业务模式等相关的互联网信息。
-    output_example: "[结构化搜索结果，每个公司一个搜索结果列表]"
 
   - name: get_all_financial_data
     usage: 获取目标公司及其竞争对手的年度财务报表。
@@ -100,38 +81,173 @@ tools:
       3. 依赖外部工具进行格式化和转换，若缺少应提供友好提示。
       4. 该函数必须在所有前置准备（get_analysis_report）完成后调用。
 
-  - name: prepare_report_assets
-    usage: 提取基础 Markdown 报告中的图片，统一保存至 images 目录，并生成清洗后的新报告。
-    params:
-      - md_file_path: 初始 Markdown 报告路径（string）
-    output_example: "./财务研报汇总_images.md"
-    extra: |
-      1. 本函数必须作为第一步调用。  
-      2. 不存在的图片会被剔除，其引用语法会从 Markdown 中移除。  
-      3. 所有图片路径会重写为 ./images/xxx.png 相对路径，便于后续转换为 Word。
+  # ========== 行业研报工具 ==========
+  - name: get_industry_overview
+    usage: 获取目标行业的基本概况和发展现状。
+    output_example: |
+      {
+        "人工智能行业概况 发展现状": [
+          {"title": "2024年AI行业发展报告", "body": "行业发展迅速..."}
+        ]
+      }
+    extra: 收集行业概况、发展现状、市场容量等基础信息。
 
-  - name: generate_full_report_sections
-    usage: 基于整理后的报告内容和图片，生成每个章节的 markdown 文本。
-    params:
-      - md_path: 已清洗并重新引用图片的 markdown 文件路径（string）
+  - name: get_industry_chain_analysis
+    usage: 分析目标行业的产业链上下游关系。
+    output_example: |
+      {
+        "人工智能产业链上游 供应商": [
+          {"title": "AI芯片供应商分析", "body": "上游主要包括..."}
+        ]
+      }
+    extra: 深入分析产业链结构、价值分布和关键环节。
+
+  - name: get_industry_policy_impact
+    usage: 收集分析相关行业政策对目标行业的影响。
+    output_example: |
+      {
+        "人工智能行业政策 国家政策": [
+          {"title": "AI行业政策解读", "body": "政策支持力度..."}
+        ]
+      }
+    extra: 包含国家政策、监管变化、发展规划等。
+
+  - name: get_industry_technology_trends
+    usage: 分析目标行业的技术发展趋势和创新方向。
+    output_example: |
+      {
+        "人工智能技术发展趋势 创新": [
+          {"title": "AI技术演进路径", "body": "技术发展方向..."}
+        ]
+      }
+    extra: 关注技术演进、创新突破、未来发展方向。
+
+  - name: get_industry_association_reports
+    usage: 收集目标行业协会发布的年度报告和统计数据。
+    output_example: |
+      {
+        "人工智能行业协会 年度报告": [
+          {"title": "中国AI产业发展白皮书", "body": "协会统计显示..."}
+        ]
+      }
+    extra: 获取权威行业数据和官方统计信息。
+
+  - name: get_industry_market_scale
+    usage: 收集分析目标行业的市场规模和增长数据。
+    output_example: |
+      {
+        "人工智能市场规模 市场容量": [
+          {"title": "AI市场规模预测", "body": "市场规模达到..."}
+        ]
+      }
+    extra: 包含市场容量、增长预测、细分市场数据。
+
+  - name: get_leading_companies_data
+    usage: 收集目标行业龙头企业的相关信息和数据。
     output_example: |
       [
-        "## 公司概况\n商汤科技成立于...",
-        "## 财务分析\n收入增长率为...",
-        "## 投资建议\n我们建议增持..."
+        {"title": "AI行业龙头企业排名", "body": "百度、阿里巴巴..."}
       ]
-    extra: |
-      1. 函数会调用 LLM 自动生成大纲和各章节内容。  
-      2. 所有章节以 markdown 格式返回，调用方负责保存与拼接。  
-      3. 最后一章将自动追加 “引用文献” 部分。
+    extra: 识别行业领先企业，分析竞争格局。
 
-  - name: finalize_report_output
-    usage: 将所有章节内容合并保存为 Markdown 文件，并格式化、转换为 Word。
-    params:
-      - sections: markdown 格式的章节内容列表（List[str]）
-    output_example: "./深度财务研报分析_20250722.docx"
-    extra: |
-      1. 函数内部自动生成文件名，按时间戳命名。  
-      2. 使用 mdformat 进行格式化，使用 pandoc 生成 Word 文档。  
-      3. 依赖外部工具，若缺少应提供友好提示。
+  - name: analyze_industry_structure
+    usage: 基于收集的数据分析行业结构和竞争格局。
+    output_example: "行业处于快速发展期，市场集中度较高，头部企业优势明显..."
+    extra: 深度分析行业发展阶段、竞争格局、价值链分布。
+
+  - name: analyze_industry_trends
+    usage: 分析目标行业的发展趋势和未来前景。
+    output_example: "技术发展趋势向智能化、自动化方向演进，预计未来3-5年..."
+    extra: 基于数据预测行业发展方向和增长前景。
+
+  - name: generate_industry_report
+    usage: 生成完整的行业研究报告。
+    output_example: "人工智能行业研报_20250723_151530.md"
+    extra: 整合所有行业分析结果，生成专业的行业研报。
+
+  # ========== 宏观经济研报工具 ==========
+  - name: get_gdp_data
+    usage: 收集目标国家/地区的GDP增长数据和经济指标。
+    output_example: |
+      {
+        "中国GDP 国内生产总值": [
+          {"title": "2024年GDP数据发布", "body": "GDP同比增长..."}
+        ]
+      }
+    extra: 包含GDP增长率、经济结构、季度数据等。
+
+  - name: get_cpi_data
+    usage: 收集消费者价格指数和通胀相关数据。
+    output_example: |
+      {
+        "中国CPI 消费者价格指数": [
+          {"title": "CPI数据解读", "body": "通胀水平保持稳定..."}
+        ]
+      }
+    extra: 分析通胀趋势、价格变化、货币政策影响。
+
+  - name: get_interest_rate_data
+    usage: 收集利率环境和货币政策相关数据。
+    output_example: |
+      {
+        "中国利率 基准利率 央行利率": [
+          {"title": "央行货币政策分析", "body": "利率政策保持稳健..."}
+        ]
+      }
+    extra: 包含基准利率、市场利率、政策利率变化。
+
+  - name: get_exchange_rate_data
+    usage: 收集汇率数据和外汇市场信息。
+    output_example: |
+      {
+        "人民币美元汇率": [
+          {"title": "汇率走势分析", "body": "人民币对美元汇率..."}
+        ]
+      }
+    extra: 分析汇率变动、外汇政策、国际收支影响。
+
+  - name: get_federal_reserve_data
+    usage: 收集美联储利率政策和全球货币政策信息。
+    output_example: |
+      {
+        "美联储联邦基金利率": [
+          {"title": "美联储政策解读", "body": "联邦基金利率维持..."}
+        ]
+      }
+    extra: 关注美联储政策对全球经济的影响。
+
+  - name: get_policy_reports
+    usage: 收集政府政策报告和宏观调控措施。
+    output_example: |
+      {
+        "中国政府工作报告": [
+          {"title": "2024年政府工作报告", "body": "经济发展目标..."}
+        ]
+      }
+    extra: 包含财政政策、货币政策、发展规划等。
+
+  - name: get_macro_industry_impact
+    usage: 分析宏观经济环境对特定行业的影响。
+    output_example: |
+      {
+        "科技行业政策影响": [
+          {"title": "宏观政策对科技行业影响", "body": "政策环境有利于..."}
+        ]
+      }
+    extra: 分析宏观环境变化对行业的传导效应。
+
+  - name: analyze_macro_trends
+    usage: 基于宏观数据分析经济发展趋势。
+    output_example: "当前宏观经济呈现稳中有进态势，GDP增长动力主要来自..."
+    extra: 深度分析宏观经济运行态势和发展趋势。
+
+  - name: analyze_policy_impact
+    usage: 分析政策环境对经济和市场的影响。
+    output_example: "当前政策组合对经济增长具有积极作用，预计..."
+    extra: 评估财政、货币、产业政策的效果和前景。
+
+  - name: generate_macro_report
+    usage: 生成完整的宏观经济研究报告。
+    output_example: "宏观经济研报_20250723_151530.md"
+    extra: 整合宏观分析结果，生成专业的宏观经济研报。
 

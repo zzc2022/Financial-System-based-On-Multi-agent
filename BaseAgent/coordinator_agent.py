@@ -7,6 +7,9 @@ from datetime import datetime
 from .base_agent import BaseAgent
 from .memory import AgentMemory
 from .profile import AgentProfile
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from toolset.utils.report_type_config import ReportTypeConfig, ReportType
 
 
 class GlobalMemoryManager:
@@ -167,15 +170,30 @@ class AgentScheduler:
         self.agent_registry: Dict[str, BaseAgent] = {}
         self.agent_dependencies: Dict[str, List[str]] = {}
         self.execution_queue: List[str] = []
+        self.report_config = ReportTypeConfig()
         
-    def register_agent(self, agent: BaseAgent, dependencies: List[str] = None):
+    def register_agent(self, agent: BaseAgent, dependencies: List[str] = None, report_type: ReportType = ReportType.COMPANY):
         """注册agent及其依赖关系"""
         agent_name = agent.profile.name
         self.agent_registry[agent_name] = agent
         self.agent_dependencies[agent_name] = dependencies or []
         
+        # 根据研报类型更新agent的工具集
+        self._update_agent_toolset(agent, report_type)
+        
         # 注册agent的记忆到全局管理器
         self.memory_manager.register_agent_memory(agent_name, agent.memory)
+        
+    def _update_agent_toolset(self, agent: BaseAgent, report_type: ReportType):
+        """根据研报类型更新agent的工具集"""
+        if agent.profile.name == "DataAgent":
+            # 获取数据收集工具
+            data_tools = self.report_config.get_data_tools(report_type)
+            agent.toolset = data_tools
+        elif agent.profile.name == "AnalysisAgent":
+            # 获取分析工具
+            analysis_tools = self.report_config.get_analysis_tools(report_type)
+            agent.toolset = analysis_tools
         
     def can_execute_agent(self, agent_name: str) -> bool:
         """检查agent是否可以执行（依赖是否满足）"""
@@ -354,6 +372,7 @@ class CoordinatorAgent(BaseAgent):
     """
     协调器Agent - 负责管理和调度其他Agent
     具有最高的记忆权限和全局视图
+    支持多种研报类型的生成
     """
     
     def __init__(self, profile: AgentProfile, memory: AgentMemory, planner, llm, llm_config):
@@ -365,6 +384,12 @@ class CoordinatorAgent(BaseAgent):
         
         # 初始化调度器
         self.scheduler = AgentScheduler(self.memory_manager, self.progress_tracker)
+        
+        # 初始化研报配置
+        self.report_config = ReportTypeConfig()
+        
+        # 从profile配置中确定研报类型
+        self.current_report_type = self._determine_report_type_from_profile(profile)
         
         # 创建专用的action工具集
         action = CoordinatorActionToolset(
@@ -388,13 +413,35 @@ class CoordinatorAgent(BaseAgent):
         # 设置初始阶段
         self.progress_tracker.set_current_phase("系统初始化")
     
+    def _determine_report_type_from_profile(self, profile: AgentProfile) -> ReportType:
+        """从profile配置中确定研报类型"""
+        # 检查配置中的研报类型
+        report_type_str = profile.get_config().get("report_type", "company")
+        
+        # 检查指令中的研报类型
+        instruction = profile.get_config().get("instruction", "")
+        if instruction:
+            detected_type = self.report_config.identify_report_type(instruction)
+            return detected_type
+        
+        # 根据字符串映射
+        type_mapping = {
+            "company": ReportType.COMPANY,
+            "industry": ReportType.INDUSTRY,
+            "macro": ReportType.MACRO
+        }
+        return type_mapping.get(report_type_str.lower(), ReportType.COMPANY)
+    
     def register_agent(self, agent: BaseAgent, dependencies: List[str] = None):
         """注册要管理的agent"""
-        self.scheduler.register_agent(agent, dependencies)
+        self.scheduler.register_agent(agent, dependencies, self.current_report_type)
     
     def execute_workflow(self) -> Dict[str, Any]:
-        """执行完整的工作流程"""
-        self.progress_tracker.set_current_phase("工作流程执行")
+        """执行完整的工作流程，支持不同研报类型"""
+        report_type_name = self.report_config.get_config(self.current_report_type)["name"]
+        self.progress_tracker.set_current_phase(f"执行{report_type_name}工作流程")
+        
+        print(f"🎯 开始执行{report_type_name}生成流程")
         
         workflow_results = {}
         
@@ -411,7 +458,7 @@ class CoordinatorAgent(BaseAgent):
                 continue
             
             # 执行下一个agent
-            print(f"🎯 Coordinator: 执行 {next_agent}")
+            print(f"🎯 Coordinator: 执行 {next_agent} ({report_type_name})")
             result = self.scheduler.execute_agent(next_agent)
             workflow_results[next_agent] = result
             
@@ -419,7 +466,7 @@ class CoordinatorAgent(BaseAgent):
             if next_agent in ["DataAgent", "AnalysisAgent"]:
                 self.progress_tracker.complete_phase(f"{next_agent}完成")
         
-        self.progress_tracker.set_current_phase("工作流程完成")
+        self.progress_tracker.set_current_phase(f"{report_type_name}工作流程完成")
         return workflow_results
     
     def get_global_summary(self) -> str:

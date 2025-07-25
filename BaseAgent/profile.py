@@ -40,7 +40,17 @@ class AgentProfile:
         return self.config
 
     def get_identity(self) -> str:
-        return f"{self.config['company']}（{self.config['market']}:{self.config['code']}）"
+        """根据研报类型返回身份标识"""
+        report_type = self.config.get("report_type", "company")
+        
+        if report_type == "company":
+            return f"{self.config['company']}（{self.config['market']}:{self.config['code']}）"
+        elif report_type == "industry":
+            return f"{self.config.get('industry', '未指定行业')}行业"
+        elif report_type == "macro":
+            return f"{self.config.get('country', '中国')}宏观经济"
+        else:
+            return "未指定目标"
 
     def get_objectives(self) -> List[str]:
         return self.objectives

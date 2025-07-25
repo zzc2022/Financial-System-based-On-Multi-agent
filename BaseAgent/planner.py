@@ -17,13 +17,27 @@ class AgentPlanner:
             else:
                 context_summary += f"【{k}】[结构化数据]\n"
 
-        if self.profile.name == "AnalysisAgent":
-            task = "请规划分析阶段的图表生成、两两对比、估值建模等任务"
-        else:
-            task = f"请规划获取 {self.profile.get_identity()} 的基础信息、竞争者和财务信息。"
+        # 生成任务描述
+        report_type = self.profile.get_config().get("report_type", "company")
+        if report_type == "industry":
+            task = f"请规划{self.profile.get_config().get('industry', '目标行业')}行业研报的数据收集和分析任务"
+        elif report_type == "macro":
+            task = f"请规划{self.profile.get_config().get('country', '中国')}宏观经济研报的数据收集和分析任务"
+        else:  # company
+            if self.profile.name == "AnalysisAgent":
+                task = "请规划分析阶段的图表生成、两两对比、估值建模等任务"
+            else:
+                task = f"请规划获取 {self.profile.get_identity()} 的基础信息、竞争者和财务信息。"
 
-        # Load system prompt from YAML file
-        system_prompt = self.prompt_manager.load_system_prompt(self.prompt_path, self.profile.name)
+        # 使用新的prompt加载方法
+        try:
+            system_prompt = self.prompt_manager.load_system_prompt_from_profile(
+                self.prompt_path, self.profile, toolset
+            )
+        except:
+            # 如果新方法失败，回退到旧方法
+            system_prompt = self.prompt_manager.load_system_prompt(self.prompt_path, self.profile.name)
+            
         # Prepare the prompt for the LLM
         user_prompt = self.prompt_manager.render_user_prompt(
             "user_prompt.jinja", {

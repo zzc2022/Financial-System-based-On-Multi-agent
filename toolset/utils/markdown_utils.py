@@ -121,7 +121,7 @@ def save_markdown(content, output_file):
     """保存markdown文件"""
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(content)
-    print(f"\n📁 深度财务研报分析已保存到: {output_file}")
+    print(f"\n📁 深度研报分析已保存到: {output_file}")
 
 def format_markdown(output_file):
     """格式化markdown文件"""
@@ -193,12 +193,12 @@ def copy_image(src, dst):
         return False
 
 def extract_images_from_markdown(md_path, images_dir, new_md_path):
-    """从markdown中提取图片"""
+    """从markdown中提取图片，并自动发现session目录中的图片"""
     ensure_dir(images_dir)
     with open(md_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    # 匹配 ![alt](path) 形式的图片
+    # 首先处理已存在的图片引用
     pattern = re.compile(r'!\[[^\]]*\]\(([^)]+)\)')
     matches = pattern.findall(content)
     used_names = set()
@@ -223,34 +223,175 @@ def extract_images_from_markdown(md_path, images_dir, new_md_path):
         new_img_path = os.path.join(images_dir, new_filename)
         # 下载或复制
         img_exists = True
+        
         if is_url(img_path):
-            success = download_image(img_path, new_img_path)
-            if not success:
+            # 下载网络图片
+            try:
+                response = requests.get(img_path, stream=True)
+                response.raise_for_status()
+                with open(new_img_path, 'wb') as f:
+                    shutil.copyfileobj(response.raw, f)
+            except Exception as e:
                 img_exists = False
+                not_exist_set.add(img_path)
+                print(f"下载图片失败 {img_path}: {e}")
         else:
-            # 支持绝对和相对路径
-            abs_img_path = img_path
+            # 复制本地图片 - 使用绝对路径处理
+            original_path = img_path
             if not os.path.isabs(img_path):
-                abs_img_path = os.path.join(os.path.dirname(md_path), img_path)
-            if not os.path.exists(abs_img_path):
-                print(f"[警告] 本地图片不存在: {abs_img_path}")
-                img_exists = False
+                # 如果是相对路径，相对于markdown文件所在目录
+                original_path = os.path.join(os.path.dirname(md_path), img_path)
+            
+            if os.path.exists(original_path):
+                try:
+                    shutil.copy2(original_path, new_img_path)
+                except Exception as e:
+                    img_exists = False
+                    not_exist_set.add(img_path)
+                    print(f"复制图片失败 {original_path}: {e}")
             else:
-                copy_image(abs_img_path, new_img_path)
-        # 记录替换
+                img_exists = False
+                not_exist_set.add(img_path)
+        
         if img_exists:
-            replace_map[img_path] = f'./images/{new_filename}'
+            replace_map[img_path] = f"images/{new_filename}"
+
+    # 自动发现并添加session目录中的图片
+    print("🔍 自动发现财务分析图表...")
+    # 直接使用当前工作目录下的data/financials
+    data_financials_dir = os.path.join(os.getcwd(), "data", "financials")
+    if data_financials_dir and os.path.exists(data_financials_dir):
+        # 找到最新的session目录
+        session_dirs = [d for d in os.listdir(data_financials_dir) if d.startswith('session_')]
+        if session_dirs:
+            # 按修改时间排序，选择最新的
+            session_dirs.sort(key=lambda x: os.path.getmtime(os.path.join(data_financials_dir, x)), reverse=True)
+            latest_session = session_dirs[0]
+            session_path = os.path.join(data_financials_dir, latest_session)
+            
+            # 查找所有图片文件
+            image_files = []
+            for ext in ['*.png', '*.jpg', '*.jpeg', '*.gif', '*.svg']:
+                import glob
+                image_files.extend(glob.glob(os.path.join(session_path, ext)))
+            
+            if image_files:
+                print(f"📊 发现 {len(image_files)} 个财务分析图表")
+                
+                # 在内容中添加图表展示部分
+                chart_section = "\n\n## 财务分析图表\n\n"
+                chart_section += "以下是系统自动生成的财务分析图表：\n\n"
+                
+                for img_file in image_files:
+                    # 复制图片到images目录
+                    filename = os.path.basename(img_file)
+                    base, ext = os.path.splitext(filename)
+                    i = 1
+                    new_filename = filename
+                    while new_filename in used_names:
+                        new_filename = f"{base}_{i}{ext}"
+                        i += 1
+                    used_names.add(new_filename)
+                    
+                    new_img_path = os.path.join(images_dir, new_filename)
+                    try:
+                        shutil.copy2(img_file, new_img_path)
+                        # 添加图片引用到内容中
+                        chart_name = base.replace('_', ' ').replace('-', ' ').title()
+                        chart_section += f"### {chart_name}\n\n"
+                        chart_section += f"![{chart_name}](images/{new_filename})\n\n"
+                        print(f"✅ 已添加图表: {chart_name}")
+                    except Exception as e:
+                        print(f"❌ 复制图表失败 {img_file}: {e}")
+                
+                # 将图表部分插入到内容中（在结尾或合适位置）
+                if "## 总结" in content:
+                    content = content.replace("## 总结", chart_section + "## 总结")
+                else:
+                    content += chart_section
+            else:
+                print("⚠️ 未发现财务分析图表文件")
         else:
-            not_exist_set.add(img_path)
+            print("⚠️ 未找到session目录")
+    else:
+        print("⚠️ 未找到data/financials目录")
 
-    # 替换 markdown 内容，不存在的图片直接删除整个图片语法
-    def replace_func(match):
-        orig = match.group(1).strip()
-        if orig in not_exist_set:
-            return ''  # 删除不存在的图片语法
-        return match.group(0).replace(orig, replace_map.get(orig, orig))
+    # 替换原有的图片路径
+    for old_path, new_path in replace_map.items():
+        content = content.replace(f"]({old_path})", f"]({new_path})")
 
-    new_content = pattern.sub(replace_func, content)
+    # 保存新文件
     with open(new_md_path, 'w', encoding='utf-8') as f:
-        f.write(new_content)
-    print(f"图片处理完成！新文件: {new_md_path}")
+        f.write(content)
+
+    print(f"✅ 图片处理完成，保存到: {new_md_path}")
+    if not_exist_set:
+        print(f"⚠️ 以下图片未找到: {not_exist_set}")
+    
+    return new_md_path
+
+if __name__ == "__main__":
+    import tempfile
+    
+    def test_extract_images_functionality():
+        """测试图片提取功能"""
+        print("🧪 开始测试图片提取功能...")
+        
+        # 创建测试用的markdown内容
+        test_content = """# 测试报告
+
+## 财务分析
+
+这是一个测试报告，包含以下内容：
+
+![示例图片](收入利润趋势.png)
+
+## 总结
+
+测试完成。
+"""
+        
+        # 创建临时文件
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as f:
+            f.write(test_content)
+            test_md_path = f.name
+        
+        print(f"📄 创建测试文件: {test_md_path}")
+        
+        # 创建临时图片目录
+        with tempfile.TemporaryDirectory() as temp_dir:
+            images_dir = os.path.join(temp_dir, 'images')
+            new_md_path = test_md_path.replace('.md', '_images.md')
+            
+            try:
+                # 测试图片提取功能
+                print("🔍 测试路径搜索功能...")
+                result_path = extract_images_from_markdown(test_md_path, images_dir, new_md_path)
+                
+                print(f"✅ 功能测试完成！")
+                print(f"📁 输出文件: {result_path}")
+                
+                # 检查输出文件内容
+                if os.path.exists(result_path):
+                    with open(result_path, 'r', encoding='utf-8') as f:
+                        new_content = f.read()
+                    print("📖 处理后的内容预览:")
+                    print(new_content[:500] + "..." if len(new_content) > 500 else new_content)
+                
+            except Exception as e:
+                print(f"❌ 测试失败: {e}")
+                import traceback
+                traceback.print_exc()
+            finally:
+                # 清理临时文件
+                try:
+                    os.unlink(test_md_path)
+                    if os.path.exists(new_md_path):
+                        os.unlink(new_md_path)
+                except:
+                    pass
+        
+        print("🏁 测试完成！")
+    
+    # 运行测试
+    test_extract_images_functionality()
