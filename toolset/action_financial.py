@@ -13,6 +13,7 @@ import time, random, os
 from datetime import datetime
 import glob
 import json
+from pathlib import Path
 
 class FinancialActionToolset:
     def __init__(self, profile, memory, llm, llm_config):
@@ -33,6 +34,33 @@ class FinancialActionToolset:
         
         # 当前研报类型（从profile配置中获取，默认为公司研报）
         self.current_report_type = self._determine_report_type()
+        
+        # 🎯 新增：报告路径存储属性
+        self.generated_report_paths = {
+            "company_report": None,      # 公司研报路径
+            "industry_report": None,     # 行业研报路径  
+            "macro_report": None,        # 宏观研报路径
+            "deep_report": None,         # 深度研报路径
+            "analysis_report": None,     # 分析报告路径
+            "latest_report": None        # 最新生成的报告路径
+        }
+        
+        # 确保报告目录存在
+        os.makedirs(self.reports_dir, exist_ok=True)
+        
+    def _update_report_path(self, report_type: str, file_path: str):
+        """更新报告路径到类属性中"""
+        self.generated_report_paths[report_type] = file_path
+        self.generated_report_paths["latest_report"] = file_path
+        print(f"📄 已保存{report_type}路径: {file_path}")
+    
+    def get_latest_report_path(self) -> str:
+        """获取最新生成的报告路径"""
+        return self.generated_report_paths.get("latest_report")
+        
+    def get_report_path(self, report_type: str) -> str:
+        """获取指定类型的报告路径"""
+        return self.generated_report_paths.get(report_type)
     
     def _determine_report_type(self) -> ReportType:
         """确定研报类型"""
@@ -383,6 +411,9 @@ class FinancialActionToolset:
         sensetime_valuation_report = context.get("sensetime_valuation_report", None)
         formatted_report = format_final_reports(merged_results)
         
+        # 🔍 查找并添加session目录中的图表
+        charts_section = self._find_and_add_session_charts()
+        
         # 统一保存为markdown
         md_output_file = f"财务研报汇总_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
         with open(md_output_file, 'w', encoding='utf-8') as f:
@@ -392,8 +423,14 @@ class FinancialActionToolset:
             f.write(f"# 财务数据分析与两两对比\n\n{formatted_report}\n\n")
             if sensetime_valuation_report and isinstance(sensetime_valuation_report, dict):
                 f.write(f"# 商汤科技估值与预测分析\n\n{sensetime_valuation_report.get('final_report', '未生成报告')}\n\n")
+            # 添加图表部分
+            if charts_section:
+                f.write(charts_section)
         
         print(f"\n✅ 第一阶段完成！基础分析报告已保存到: {md_output_file}")
+        
+        # 🎯 保存报告路径到类属性
+        self._update_report_path("analysis_report", md_output_file)
         
         # 存储结果供第二阶段使用
         self.analysis_results = {
@@ -405,6 +442,59 @@ class FinancialActionToolset:
             'sensetime_valuation_report': sensetime_valuation_report
         }
         return md_output_file
+    
+    def _find_and_add_session_charts(self):
+        """查找session目录中的图表并生成markdown引用"""
+        import glob
+        
+        print("🔍 搜索session目录中的分析图表...")
+        data_financials_dir = os.path.join(os.getcwd(), "data", "financials")
+        
+        if not os.path.exists(data_financials_dir):
+            print("⚠️ 未找到data/financials目录")
+            return ""
+        
+        # 找到所有session目录
+        session_dirs = [d for d in os.listdir(data_financials_dir) if d.startswith('session_')]
+        if not session_dirs:
+            print("⚠️ 未找到session目录")
+            return ""
+        
+        # 按修改时间排序，选择最新的session
+        session_dirs.sort(key=lambda x: os.path.getmtime(os.path.join(data_financials_dir, x)), reverse=True)
+        latest_session = session_dirs[0]
+        session_path = os.path.join(data_financials_dir, latest_session)
+        
+        print(f"📊 使用最新session目录: {latest_session}")
+        
+        # 查找所有图片文件
+        image_files = []
+        for ext in ['*.png', '*.jpg', '*.jpeg', '*.gif', '*.svg']:
+            image_files.extend(glob.glob(os.path.join(session_path, ext)))
+        
+        if not image_files:
+            print("⚠️ session目录中未发现图表文件")
+            return ""
+        
+        print(f"📈 发现 {len(image_files)} 个分析图表")
+        
+        # 生成图表展示部分
+        charts_section = "\n\n# 财务分析图表\n\n"
+        charts_section += "以下是系统自动生成的财务分析图表：\n\n"
+        
+        for img_file in image_files:
+            filename = os.path.basename(img_file)
+            # 使用相对路径引用，方便后续处理
+            relative_path = f"./data/financials/{latest_session}/{filename}"
+            
+            # 生成更友好的图表名称
+            chart_name = filename.replace('_', ' ').replace('-', ' ').replace('.png', '').replace('.jpg', '').replace('.jpeg', '').title()
+            
+            charts_section += f"## {chart_name}\n\n"
+            charts_section += f"![{chart_name}]({relative_path})\n\n"
+            print(f"✅ 已添加图表引用: {chart_name}")
+        
+        return charts_section
     
 
 
@@ -450,6 +540,10 @@ class FinancialActionToolset:
         final_report = '\n\n'.join(full_report)
         output_file = f"深度财务研报分析_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
         save_markdown(final_report, output_file)
+        
+        # 🎯 保存报告路径到类属性
+        self._update_report_path("deep_report", output_file)
+        self._update_report_path("company_report", output_file)  # 公司研报也指向深度报告
         
         # 格式化和转换
         print("\n🎨 格式化报告...")
@@ -976,8 +1070,11 @@ class FinancialActionToolset:
             report_content += f"## {title}\n\n{content.strip()}\n\n"
 
         # 保存文件
-        output_file = f"{industry_name}行业研报_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+        output_file = f"行业研报_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
         save_markdown(report_content, output_file)
+
+        # 🎯 保存报告路径到类属性
+        self._update_report_path("industry_report", output_file)
 
         return {"industry_report_file": output_file, "content": report_content}
     
@@ -1058,8 +1155,422 @@ class FinancialActionToolset:
         output_file = f"{country}宏观经济研报_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
         save_markdown(full_report, output_file)
 
+        # 🎯 保存报告路径到类属性
+        self._update_report_path("macro_report", output_file)
+
         print(f"✅ 报告生成完毕，保存至 {output_file}")
         return {
             "macro_report_file": output_file,
             "content": full_report
         }
+
+    #### 研报评价工具 ####
+    def load_report_content(self, context):
+        """加载研报内容进行评价"""
+        # 1.获取报告内容
+        base_path = Path(".")
+        files = []
+        if self.current_report_type == ReportType.COMPANY:
+            files = base_path.glob("深度财务研报分析*.md")
+        elif self.current_report_type == ReportType.INDUSTRY:
+            files = base_path.glob("行业研报*.md")
+        elif self.current_report_type == ReportType.MACRO:
+            files = base_path.glob("中国宏观经济研报*.md")
+        else:
+            print(f"未知的报告类型: {self.current_report_type}")
+            return
+
+        content = ""
+        for file_path in files:
+            content = file_path.read_text(encoding="utf-8")
+            print(f"===== {file_path} =====")
+            print(content[:200])
+
+        # 2.保存到context
+        if content:
+            self.m.context_set("report_content", content)
+        else:
+            print("未找到匹配的报告文件")
+
+    def identify_report_type_for_evaluation(self, context):
+        """识别研报类型以选择合适的评价标准"""
+        report_content = self.m.context_get("report_content")
+        if not report_content:
+            return "请先加载研报内容"
+        
+        # 使用现有的报告类型配置识别
+        report_type = self.report_config.identify_report_type(report_content)
+        
+        self.m.context_set("evaluation_report_type", report_type)
+        self.m.context_set("report_type_identified", True)
+        
+        type_name = self.report_config.get_config(report_type)['name']
+        return f"识别研报类型为: {type_name}"
+    
+    def evaluate_content_completeness(self, context):
+        """评价内容完整性"""
+        return self._evaluate_report_dimension(context, "content_completeness", "内容完整性")
+    
+    def evaluate_data_accuracy(self, context):
+        """评价数据准确性"""
+        return self._evaluate_report_dimension(context, "data_accuracy", "数据准确性")
+    
+    def evaluate_analysis_depth(self, context):
+        """评价分析深度"""
+        return self._evaluate_report_dimension(context, "analysis_depth", "分析深度")
+    
+    def evaluate_logical_coherence(self, context):
+        """评价逻辑一致性"""
+        return self._evaluate_report_dimension(context, "logical_coherence", "逻辑一致性")
+    
+    def evaluate_professional_quality(self, context):
+        """评价专业性"""
+        return self._evaluate_report_dimension(context, "professional_quality", "专业性")
+    
+    def evaluate_market_insight(self, context):
+        """评价市场洞察力（行业研报专用）"""
+        return self._evaluate_report_dimension(context, "market_insight", "市场洞察力")
+    
+    def evaluate_macroeconomic_insight(self, context):
+        """评价宏观洞察力（宏观研报专用）"""
+        return self._evaluate_report_dimension(context, "macroeconomic_insight", "宏观洞察力")
+    
+    def calculate_overall_evaluation_score(self, context):
+        """计算综合评分"""
+        report_type = self.m.context_get("evaluation_report_type")
+        if not report_type:
+            return {"error": "请先识别研报类型"}
+        
+        # 评价标准权重配置
+        criteria_weights = self._get_evaluation_criteria(report_type)
+        
+        overall_score = 0.0
+        detailed_scores = {}
+        
+        # 汇总各维度评分
+        for dimension_name, weight in criteria_weights.items():
+            score_data = self.m.context_get(f"{dimension_name}_evaluation")
+            if score_data and isinstance(score_data, dict):
+                dimension_score = score_data.get("score", 0)
+                weighted_score = dimension_score * weight
+                overall_score += weighted_score
+                
+                detailed_scores[dimension_name] = {
+                    "score": dimension_score,
+                    "weight": weight,
+                    "weighted_score": weighted_score,
+                    "feedback": score_data.get("feedback", "")
+                }
+        
+        # 评分等级
+        grade = self._get_evaluation_grade(overall_score)
+        
+        final_result = {
+            "overall_score": round(overall_score, 2),
+            "grade": grade,
+            "detailed_scores": detailed_scores,
+            "evaluation_time": datetime.now().isoformat(),
+            "report_type": self.report_config.get_config(report_type)["name"]
+        }
+        
+        self.m.context_set("final_evaluation", final_result)
+        return final_result
+    
+    def generate_evaluation_report(self, context):
+        """生成评价报告"""
+        final_evaluation = self.m.context_get("final_evaluation")
+        if not final_evaluation:
+            return "请先完成综合评分计算"
+        
+        report_template = f"""
+# 研报质量评价报告
+
+## 基本信息
+- **研报类型**: {final_evaluation['report_type']}
+- **评价时间**: {final_evaluation['evaluation_time']}
+- **综合评分**: {final_evaluation['overall_score']}/100
+- **评价等级**: {final_evaluation['grade']}
+
+## 详细评分
+
+{self._format_detailed_scores(final_evaluation['detailed_scores'])}
+
+## 评价总结
+
+{self._generate_evaluation_summary(final_evaluation)}
+
+## 评分说明
+- A级 (90-100分): 优秀，达到行业领先水平
+- B级 (80-89分): 良好，符合专业标准  
+- C级 (70-79分): 合格，基本满足要求
+- D级 (60-69分): 需要改进
+- F级 (0-59分): 不合格，需要重新撰写
+        """
+        
+        self.m.context_set("evaluation_report", report_template.strip())
+        return "评价报告生成完成"
+    
+    def save_evaluation_result(self, context):
+        """保存评价结果"""
+        evaluation_report = self.m.context_get("evaluation_report")
+        final_evaluation = self.m.context_get("final_evaluation")
+        
+        if not evaluation_report or not final_evaluation:
+            return "请先生成评价报告"
+        
+        # 确定保存路径
+        report_path = "./"
+        if report_path:
+            base_dir = os.path.dirname(report_path)
+            base_name = os.path.splitext(os.path.basename(report_path))[0]
+        else:
+            base_dir = os.path.join(self.m.data_dir, "evaluation")
+            base_name = f"evaluation_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            
+        os.makedirs(base_dir, exist_ok=True)
+        
+        # 保存评价报告
+        report_file = os.path.join(base_dir, f"{base_name}_evaluation.md")
+        with open(report_file, 'w', encoding='utf-8') as f:
+            f.write(evaluation_report)
+        
+        # 保存评分数据
+        json_file = os.path.join(base_dir, f"{base_name}_scores.json") 
+        with open(json_file, 'w', encoding='utf-8') as f:
+            json.dump(final_evaluation, f, ensure_ascii=False, indent=2)
+        
+        return f"评价结果已保存:\n- 报告: {report_file}\n- 数据: {json_file}"
+    
+    def _evaluate_report_dimension(self, context, dimension, dimension_name):
+        """通用维度评价方法"""
+        report_content = self.m.context_get("report_content")
+        report_type = self.m.context_get("evaluation_report_type")
+        
+        if not report_content or not report_type:
+            return {"error": "请先加载研报内容并识别类型"}
+        
+        # 获取评价标准
+        criteria = self._get_dimension_criteria(report_type, dimension)
+        if not criteria:
+            return {"error": f"该研报类型不支持{dimension_name}评价"}
+        
+        # 构建评价prompt
+        evaluation_prompt = self._build_evaluation_prompt(
+            report_content, dimension_name, criteria, report_type
+        )
+        
+        try:
+            # 调用LLM进行评价
+            response = self.llm.call(
+                evaluation_prompt,
+                system_prompt="你是专业的金融研报评价专家，请客观公正地进行评价。",
+                temperature=0.3
+            )
+            
+            # 解析评分结果
+            result = self._parse_evaluation_result(response, dimension_name)
+            self.m.context_set(f"{dimension}_evaluation", result)
+            
+            return result
+            
+        except Exception as e:
+            return {"error": f"{dimension_name}评价失败: {str(e)}"}
+    
+    def _get_evaluation_criteria(self, report_type):
+        """获取评价标准权重"""
+        criteria_mapping = {
+            ReportType.COMPANY: {
+                "content_completeness": 0.25,
+                "data_accuracy": 0.20,
+                "analysis_depth": 0.25,
+                "logical_coherence": 0.15,
+                "professional_quality": 0.15
+            },
+            ReportType.INDUSTRY: {
+                "content_completeness": 0.25,
+                "market_insight": 0.25,
+                "data_accuracy": 0.20,
+                "analysis_depth": 0.15,
+                "professional_quality": 0.15
+            },
+            ReportType.MACRO: {
+                "macroeconomic_insight": 0.30,
+                "data_accuracy": 0.20,
+                "analysis_depth": 0.20,
+                "logical_coherence": 0.15,
+                "professional_quality": 0.15
+            }
+        }
+        return criteria_mapping.get(report_type, criteria_mapping[ReportType.COMPANY])
+    
+    def _get_dimension_criteria(self, report_type, dimension):
+        """获取具体维度的评价细则"""
+        criteria_details = {
+            ReportType.COMPANY: {
+                "content_completeness": ["公司概况描述是否全面", "财务分析是否深入", "竞争对手分析是否到位", "投资建议是否明确", "风险提示是否充分"],
+                "data_accuracy": ["财务数据引用是否准确", "数据计算是否正确", "数据来源是否可靠", "数据时效性是否合适"],
+                "analysis_depth": ["财务分析是否深入透彻", "业务模式分析是否清晰", "行业地位分析是否准确", "估值分析是否合理"],
+                "logical_coherence": ["论证逻辑是否清晰", "结论与分析是否一致", "章节间逻辑是否连贯"],
+                "professional_quality": ["专业术语使用是否准确", "分析方法是否科学", "表达是否专业规范"]
+            },
+            ReportType.INDUSTRY: {
+                "content_completeness": ["行业概况是否全面", "产业链分析是否完整", "市场规模分析是否准确", "技术趋势分析是否到位", "政策分析是否充分"],
+                "market_insight": ["行业发展趋势判断是否准确", "竞争格局分析是否深入", "市场机会识别是否精准", "行业痛点分析是否到位"],
+                "data_accuracy": ["数据覆盖范围是否广泛", "数据维度是否全面", "历史数据是否充分", "预测数据是否合理"],
+                "analysis_depth": ["分析框架是否科学", "分析方法是否合适", "分析层次是否清晰"],
+                "professional_quality": ["投资建议是否具体", "风险提示是否实用", "结论是否有指导意义"]
+            },
+            ReportType.MACRO: {
+                "macroeconomic_insight": ["宏观趋势判断是否准确", "政策解读是否深入", "国际影响分析是否到位", "经济周期判断是否合理"],
+                "data_accuracy": ["数据来源是否权威", "数据处理是否科学", "数据解读是否准确", "预测数据是否合理"],
+                "analysis_depth": ["货币政策分析是否深入", "财政政策影响是否准确", "政策传导机制是否清晰", "政策效果预判是否合理"],
+                "logical_coherence": ["趋势预测是否合理", "风险预警是否及时", "机会识别是否准确", "时间窗口判断是否合适"],
+                "professional_quality": ["投资策略是否具体", "资产配置建议是否合理", "时机把握是否准确", "风险控制建议是否有效"]
+            }
+        }
+        
+        type_criteria = criteria_details.get(report_type, criteria_details[ReportType.COMPANY])
+        return type_criteria.get(dimension, [])
+    
+    def _build_evaluation_prompt(self, report_content, dimension_name, criteria, report_type):
+        """构建评价prompt"""
+        type_name = self.report_config.get_config(report_type)['name']
+        
+        prompt = f"""
+你是一位专业的金融研报评价专家，请对以下{type_name}在"{dimension_name}"维度进行客观评价。
+
+## 评价标准
+{dimension_name}主要包括以下方面：
+"""
+        
+        for i, criterion in enumerate(criteria, 1):
+            prompt += f"{i}. {criterion}\n"
+        
+        # 截取报告内容（避免过长）
+        content_preview = report_content[:4000] + "..." if len(report_content) > 4000 else report_content
+        
+        prompt += f"""
+
+## 研报内容
+{content_preview}
+
+## 评价要求
+请仔细阅读研报内容，根据上述评价标准进行评价：
+1. 逐项检查是否满足评价标准
+2. 给出0-100分的评分（分数越高表示质量越好）
+3. 提供具体的评价反馈，包括优点和不足
+4. 评价要客观公正，有理有据
+
+## 输出格式
+请严格按照以下JSON格式输出（不要添加其他内容）：
+{{
+    "score": 评分数字(0-100的整数),
+    "feedback": "具体的评价反馈，包括优点和不足，200-300字"
+}}
+"""
+        
+        return prompt
+    
+    def _parse_evaluation_result(self, response, dimension_name):
+        """解析LLM评价结果"""
+        try:
+            # 尝试从响应中提取JSON
+            import re
+            json_pattern = r'\{[^{}]*"score"[^{}]*"feedback"[^{}]*\}'
+            json_match = re.search(json_pattern, response, re.DOTALL)
+            
+            if json_match:
+                json_str = json_match.group(0)
+                result = json.loads(json_str)
+                
+                # 验证必要字段
+                if "score" in result and "feedback" in result:
+                    # 确保分数在有效范围内
+                    result["score"] = max(0, min(100, int(result["score"])))
+                    return result
+            
+            # 如果JSON解析失败，尝试简单解析
+            score_match = re.search(r'(\d+)', response)
+            score = int(score_match.group(1)) if score_match else 70
+            
+            return {
+                "score": max(0, min(100, score)),
+                "feedback": f"{dimension_name}评价：" + response[:300],
+            }
+            
+        except Exception as e:
+            return {
+                "score": 70,
+                "feedback": f"评价解析失败: {str(e)}，原始回复：{response[:200]}",
+            }
+    
+    def _get_evaluation_grade(self, score):
+        """根据分数获取等级"""
+        if score >= 90:
+            return "A级 (优秀)"
+        elif score >= 80:
+            return "B级 (良好)"
+        elif score >= 70:
+            return "C级 (合格)"
+        elif score >= 60:
+            return "D级 (需要改进)"
+        else:
+            return "F级 (不合格)"
+    
+    def _format_detailed_scores(self, detailed_scores):
+        """格式化详细评分"""
+        formatted = ""
+        for dimension, scores in detailed_scores.items():
+            dimension_name = {
+                "content_completeness": "内容完整性",
+                "data_accuracy": "数据准确性", 
+                "analysis_depth": "分析深度",
+                "logical_coherence": "逻辑一致性",
+                "professional_quality": "专业性",
+                "market_insight": "市场洞察力",
+                "macroeconomic_insight": "宏观洞察力"
+            }.get(dimension, dimension)
+            
+            formatted += f"""
+### {dimension_name}
+- **得分**: {scores['score']}/100 (权重: {scores['weight']})
+- **加权得分**: {scores['weighted_score']:.2f}
+- **反馈**: {scores['feedback']}
+"""
+        return formatted
+    
+    def _generate_evaluation_summary(self, final_evaluation):
+        """生成评价总结"""
+        detailed_scores = final_evaluation['detailed_scores']
+        overall_score = final_evaluation['overall_score']
+        
+        strengths = []
+        improvements = []
+        
+        for dimension, scores in detailed_scores.items():
+            if scores['score'] >= 85:
+                strengths.append(f"- {dimension}: 表现优秀")
+            elif scores['score'] < 70:
+                improvements.append(f"- {dimension}: 需要改进")
+        
+        strengths_text = "\n".join(strengths) if strengths else "- 各维度表现均衡"
+        improvements_text = "\n".join(improvements) if improvements else "- 整体质量良好，继续保持"
+        
+        summary = f"""
+**优势分析:**
+{strengths_text}
+
+**改进建议:**
+{improvements_text}
+
+**总体评价:**
+该研报综合评分为{overall_score}分，{final_evaluation['grade']}。
+"""
+        if overall_score >= 80:
+            summary += "整体质量较好，符合专业标准。"
+        elif overall_score >= 70:
+            summary += "基本满足要求，但仍有提升空间。"
+        else:
+            summary += "质量有待提高，建议重点改进薄弱环节。"
+            
+        return summary

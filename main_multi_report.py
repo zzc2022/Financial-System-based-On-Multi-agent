@@ -1,9 +1,10 @@
-# main_multi_report.py - 支持多种研报类型的主程序
+# main_multi_report.py - 支持多种研报类型的主程序（包含评价功能）
 from BaseAgent.base_agent import BaseAgent
 from BaseAgent.profile import AgentProfile
 from BaseAgent.memory import AgentMemory
 from BaseAgent.planner import AgentPlanner
 from BaseAgent.coordinator_agent import CoordinatorAgent
+from BaseAgent.evaluation_agent import EvaluationAgent
 from toolset.action_financial import FinancialActionToolset
 from toolset.utils.report_type_config import ReportTypeConfig, ReportType
 from config.llm_config import LLMConfig
@@ -105,6 +106,32 @@ def create_multi_report_system(instruction: str):
         toolset=report_config.get_analysis_tools(report_type)
     )
     
+    ##### 评价Agent #####
+    evaluation_agent_profile = AgentProfile(
+        name="EvaluationAgent",
+        role=f"负责{report_type_name}质量评价与反馈",
+        objectives=[
+            f"评价生成的{report_type_name}质量",
+            "提供专业的评分和改进建议",
+            "确保研报符合专业标准"
+        ],
+        tools=report_config.get_evaluation_tools(report_type),
+        knowledge=f"具备{report_type_name}质量评价的专业标准和方法",
+        interaction={"input": "生成的研报文件", "output": "评价报告和改进建议"},
+        memory_type="short-term",
+        config=config
+    )
+    
+    # 创建评价agent
+    agent_e = EvaluationAgent(
+        profile=evaluation_agent_profile,
+        memory=memory,
+        planner=AgentPlanner(evaluation_agent_profile, llm,
+                           prompt_path="prompts/planner/toolset_illustration.yaml"),
+        llm=llm,
+        llm_config=llm_config
+    )
+    
     ##### Coordinator Agent #####
     coordinator_profile = AgentProfile(
         name="CoordinatorAgent",
@@ -132,7 +159,7 @@ def create_multi_report_system(instruction: str):
         llm_config=llm_config
     )
     
-    return coordinator, agent_d, agent_a, report_type
+    return coordinator, agent_d, agent_a, agent_e, report_type
 
 def main():
     """主函数"""
@@ -153,16 +180,17 @@ def main():
         
     try:
         # 创建多研报类型系统
-        coordinator, agent_d, agent_a, report_type = create_multi_report_system(instruction)
+        coordinator, agent_d, agent_a, agent_e, report_type = create_multi_report_system(instruction)
         
         # 注册agent到coordinator，设置依赖关系
         coordinator.register_agent(agent_d, dependencies=[])  # 数据agent没有依赖
         coordinator.register_agent(agent_a, dependencies=["DataAgent"])  # 分析agent依赖数据agent
+        coordinator.register_agent(agent_e, dependencies=["AnalysisAgent"])  # 评价agent依赖分析agent
         
         report_type_name = coordinator.report_config.get_config(report_type)["name"]
         
         print(f"\n🎯 启动{report_type_name}生成系统...")
-        print("📊 Agent依赖关系: DataAgent -> AnalysisAgent")
+        print("📊 Agent依赖关系: DataAgent -> AnalysisAgent -> EvaluationAgent")
         print("🚀 开始执行工作流程...\n")
         
         # 执行工作流程

@@ -251,3 +251,101 @@ tools:
     output_example: "宏观经济研报_20250723_151530.md"
     extra: 整合宏观分析结果，生成专业的宏观经济研报。
 
+  # ========== 研报评价工具 ==========
+  - name: load_report_content
+    usage: 加载研报文件内容，为评价做准备。
+    output_example: "成功加载研报内容，共15842字符"
+    extra: 支持markdown格式研报文件，自动识别编码格式。
+
+  - name: identify_report_type_for_evaluation
+    usage: 自动识别研报类型（公司/行业/宏观），选择相应评价标准。
+    output_example: "识别研报类型为: 公司研报"
+    extra: 基于研报内容自动识别，支持三种研报类型的差异化评价。
+
+  - name: evaluate_content_completeness
+    usage: 评价研报内容完整性，检查必要章节和信息覆盖度。
+    output_example: |
+      {
+        "score": 85,
+        "feedback": "内容结构完整，涵盖了公司概况、财务分析等核心部分，但风险提示部分略显薄弱..."
+      }
+    extra: 根据研报类型使用不同的完整性标准进行评价。
+
+  - name: evaluate_data_accuracy
+    usage: 评价研报中数据的准确性和可靠性。
+    output_example: |
+      {
+        "score": 78,
+        "feedback": "财务数据引用基本准确，但部分计算结果存在小幅偏差，数据来源标注不够完整..."
+      }
+    extra: 检查数据引用准确性、计算正确性、来源可靠性等。
+
+  - name: evaluate_analysis_depth
+    usage: 评价研报分析的深度和专业水平。
+    output_example: |
+      {
+        "score": 82,
+        "feedback": "财务分析较为深入，运用了多种分析方法，但对行业趋势的分析深度有待加强..."
+      }
+    extra: 评估分析方法科学性、逻辑深度、专业见解等。
+
+  - name: evaluate_logical_coherence
+    usage: 评价研报逻辑一致性和论证严密性。
+    output_example: |
+      {
+        "score": 80,
+        "feedback": "整体逻辑清晰，结论与分析基本一致，但部分章节间的逻辑衔接可以更加紧密..."
+      }
+    extra: 检查论证逻辑、结论一致性、章节连贯性等。
+
+  - name: evaluate_professional_quality
+    usage: 评价研报的专业性和规范性。
+    output_example: |
+      {
+        "score": 88,
+        "feedback": "专业术语使用准确，分析方法科学规范，表达专业严谨，符合行业标准..."
+      }
+    extra: 评估专业术语、分析方法、表达规范等专业要素。
+
+  - name: evaluate_market_insight
+    usage: 评价行业研报的市场洞察力（仅适用于行业研报）。
+    output_example: |
+      {
+        "score": 86,
+        "feedback": "对行业发展趋势判断准确，竞争格局分析深入，市场机会识别精准..."
+      }
+    extra: 专门针对行业研报的市场分析能力进行评价。
+
+  - name: evaluate_macroeconomic_insight
+    usage: 评价宏观研报的宏观洞察力（仅适用于宏观研报）。
+    output_example: |
+      {
+        "score": 84,
+        "feedback": "宏观趋势判断准确，政策解读深入，对国际影响分析到位..."
+      }
+    extra: 专门针对宏观研报的宏观分析能力进行评价。
+
+  - name: calculate_overall_evaluation_score
+    usage: 计算各维度加权后的综合评分。
+    output_example: |
+      {
+        "overall_score": 83.2,
+        "grade": "B级 (良好)",
+        "detailed_scores": {...},
+        "evaluation_time": "2025-01-15T10:30:00"
+      }
+    extra: 根据研报类型使用不同权重计算综合分数和等级。
+
+  - name: generate_evaluation_report
+    usage: 生成详细的评价报告，包含评分说明和改进建议。
+    output_example: "评价报告生成完成"
+    extra: 生成包含详细评分、优劣势分析和改进建议的完整评价报告。
+
+  - name: save_evaluation_result
+    usage: 保存评价结果到文件，包括报告和结构化数据。
+    output_example: |
+      评价结果已保存:
+      - 报告: /path/to/report_evaluation.md
+      - 数据: /path/to/report_scores.json
+    extra: 同时保存markdown格式报告和JSON格式评分数据。
+

@@ -1,5 +1,7 @@
 # 数据文件
 data/
+images/
+reports/
 
 # 环境变量文件
 .env

@@ -37,6 +37,18 @@ class ReportTypeConfig:
                     "get_analysis_report",
                     "deep_report_generation"
                 ],
+                "evaluation_tools": [
+                    "load_report_content",
+                    "identify_report_type_for_evaluation",
+                    "evaluate_content_completeness",
+                    "evaluate_data_accuracy",
+                    "evaluate_analysis_depth",
+                    "evaluate_logical_coherence",
+                    "evaluate_professional_quality",
+                    "calculate_overall_evaluation_score",
+                    "generate_evaluation_report",
+                    "save_evaluation_result"
+                ],
                 "prompt_template": "company_report_template",
                 "output_sections": [
                     "公司概况",
@@ -74,6 +86,18 @@ class ReportTypeConfig:
                     "industry_valuation_analysis",
                     "industry_risk_assessment",
                     "generate_industry_report"
+                ],
+                "evaluation_tools": [
+                    "load_report_content",
+                    "identify_report_type_for_evaluation",
+                    "evaluate_content_completeness",
+                    "evaluate_market_insight",
+                    "evaluate_data_accuracy",
+                    "evaluate_analysis_depth",
+                    "evaluate_professional_quality",
+                    "calculate_overall_evaluation_score",
+                    "generate_evaluation_report",
+                    "save_evaluation_result"
                 ],
                 "prompt_template": "industry_report_template",
                 "output_sections": [
@@ -115,6 +139,18 @@ class ReportTypeConfig:
                     "sector_rotation_analysis",
                     "generate_macro_report"
                 ],
+                "evaluation_tools": [
+                    "load_report_content",
+                    "identify_report_type_for_evaluation",
+                    "evaluate_macroeconomic_insight",
+                    "evaluate_data_accuracy",
+                    "evaluate_analysis_depth",
+                    "evaluate_logical_coherence",
+                    "evaluate_professional_quality",
+                    "calculate_overall_evaluation_score",
+                    "generate_evaluation_report",
+                    "save_evaluation_result"
+                ],
                 "prompt_template": "macro_report_template",
                 "output_sections": [
                     "宏观经济概况",
@@ -140,6 +176,11 @@ class ReportTypeConfig:
         """获取分析工具列表"""
         config = self.get_config(report_type)
         return config.get("analysis_tools", [])
+    
+    def get_evaluation_tools(self, report_type: ReportType) -> List[str]:
+        """获取评价工具列表"""
+        config = self.get_config(report_type)
+        return config.get("evaluation_tools", [])
     
     def get_output_sections(self, report_type: ReportType) -> List[str]:
         """获取输出章节列表"""

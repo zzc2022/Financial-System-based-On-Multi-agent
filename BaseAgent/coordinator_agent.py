@@ -225,6 +225,12 @@ class AgentScheduler:
             
         agent = self.agent_registry[agent_name]
         
+        # 🎯 简化后的逻辑：评价agent可以直接从FinancialActionToolset类属性获取报告路径
+        # 不再需要复杂的路径传递逻辑
+        context = {}
+        if agent_name == "EvaluationAgent":
+            print(f"📋 评价agent将自动获取最新生成的报告路径")
+        
         # 更新状态为运行中
         self.progress_tracker.update_agent_status(agent_name, "running", {
             "start_time": datetime.now().isoformat()
@@ -232,7 +238,14 @@ class AgentScheduler:
         
         try:
             # 执行agent
-            result = agent.run()
+            if hasattr(agent, 'run') and callable(agent.run):
+                if agent_name == "EvaluationAgent" and context:
+                    # 为评价agent传递空的上下文，它会自动获取路径
+                    result = agent.run({})
+                else:
+                    result = agent.run()
+            else:
+                result = {"error": f"Agent {agent_name} does not have a run method"}
             
             # 更新状态为完成
             self.progress_tracker.update_agent_status(agent_name, "completed", {
@@ -307,7 +320,7 @@ class CoordinatorActionToolset:
         elif progress['failed_agents']:
             return "handle_failures"
         else:
-            return "complete_project"
+            return "Done!"
     
     def execute_next_agent(self, context: Dict[str, Any]) -> str:
         """执行下一个agent"""
@@ -352,7 +365,6 @@ class CoordinatorActionToolset:
 
 ## 执行进展
 - 当前阶段: {progress['current_phase']}
-- 总体进度: {progress['overall_progress']:.1%}
 - 已完成: {len(progress['completed_agents'])} agents
 - 失败: {len(progress['failed_agents'])} agents
 
@@ -463,7 +475,7 @@ class CoordinatorAgent(BaseAgent):
             workflow_results[next_agent] = result
             
             # 生成阶段报告
-            if next_agent in ["DataAgent", "AnalysisAgent"]:
+            if next_agent in ["CoordinatorAgent", "DataAgent", "AnalysisAgent", "EvaluationAgent"]:
                 self.progress_tracker.complete_phase(f"{next_agent}完成")
         
         self.progress_tracker.set_current_phase(f"{report_type_name}工作流程完成")

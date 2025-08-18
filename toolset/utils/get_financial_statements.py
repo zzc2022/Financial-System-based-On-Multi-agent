@@ -190,9 +190,10 @@ def save_financial_statements_to_csv(financial_statements: Dict[str, Optional[pd
             # 使用指定目录保存文件
             filepath = os.path.join(save_dir, filename)
             df.to_csv(filepath, index=False, encoding='utf-8-sig')
-            print(f"已保存 {statement_type} 到文件: {filepath}")
+            # print(f"已保存 {statement_type} 到文件: {filepath}")
         else:
-            print(f"跳过保存 {statement_type}，因为数据获取失败")
+            # print(f"跳过保存 {statement_type}，因为数据获取失败")
+            pass
 
 
 
