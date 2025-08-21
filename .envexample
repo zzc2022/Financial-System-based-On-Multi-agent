@@ -1,0 +1,7 @@
+# for chat model
+OPENAI_API_KEY="YOUR_API_KEY"
+OPENAI_BASE_URL="https://api.deepseek.com/v1" # deepseek for example
+OPENAI_MODEL="deepseek-chat"
+
+# for embedding model
+QWEN_API_KEY="YOUR_API_KEY" 
